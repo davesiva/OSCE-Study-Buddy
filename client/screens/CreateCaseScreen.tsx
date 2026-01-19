@@ -194,6 +194,7 @@ export default function CreateCaseScreen() {
     { id: "msk", label: "Musculoskeletal", icon: "move" },
     { id: "obgyn", label: "O&G", icon: "users" },
     { id: "infectious", label: "Infectious Disease", icon: "alert-circle" },
+    { id: "psychiatry", label: "Psychiatry", icon: "smile" },
   ];
 
   const updateField = (field: keyof CaseFormData, value: string) => {

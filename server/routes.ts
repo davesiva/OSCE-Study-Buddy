@@ -241,6 +241,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         msk: "Musculoskeletal (bones, joints, muscles)",
         obgyn: "Obstetrics & Gynaecology",
         infectious: "Infectious Diseases",
+        psychiatry: "Psychiatry (mental health conditions)",
       };
 
       const difficultyInstructions: Record<string, string> = {
@@ -262,13 +263,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 - Patient may initially present with misleading chief complaint`,
       };
 
+      const psychiatryInstructions = specialty === "psychiatry" ? `
+PSYCHIATRY-SPECIFIC INSTRUCTIONS (CRITICAL):
+The patient's SPEECH PATTERN and BEHAVIOR must authentically reflect their psychiatric condition:
+
+For DEPRESSION:
+- Speech: Slow, soft, monotone, long pauses, short answers, sighing
+- Behavior: Poor eye contact, psychomotor retardation, flat affect
+- May need encouragement to elaborate, answers with "I don't know" frequently
+
+For ANXIETY/GAD:
+- Speech: Rapid, tangential, difficulty staying on topic, asks for reassurance
+- Behavior: Fidgety, restless, hypervigilant, catastrophizing
+- May jump between topics, express multiple worries
+
+For MANIA/HYPOMANIA:
+- Speech: Pressured, fast, loud, flight of ideas, hard to interrupt
+- Behavior: Grandiose, distractible, irritable if challenged, increased energy
+- May talk over the interviewer, jump topics rapidly
+
+For PSYCHOSIS/SCHIZOPHRENIA:
+- Speech: Disorganized (if thought disorder), poverty of speech, or elaborate delusional explanations
+- Behavior: Guarded, paranoid, may have incongruent affect
+- May be suspicious of questions, give unusual interpretations
+
+For ANXIETY DISORDERS (Panic, OCD, PTSD):
+- Speech: Varies - may be avoidant of triggers, repetitive themes
+- Behavior: Avoidance, checking, hyperarousal to certain topics
+
+The script_instructions MUST include detailed guidance on how the patient's mental state affects their speech pattern, responsiveness, and interaction style.
+` : "";
+
       const prompt = `You are an expert medical educator creating OSCE (Objective Structured Clinical Examination) cases for medical students in Singapore.
 
 Generate a realistic patient case for the specialty: ${specialtyNames[specialty] || specialty}
 Difficulty level: ${difficulty?.toUpperCase() || "MEDIUM"}
 
 ${difficultyInstructions[difficulty] || difficultyInstructions.medium}
-
+${psychiatryInstructions}
 SINGAPORE CONTEXT (IMPORTANT):
 - Use Singaporean patient names and demographics (Chinese, Malay, Indian, or Eurasian names)
 - Reference local healthcare settings (polyclinic, restructured hospital like SGH, NUH, TTSH, Changi General)
