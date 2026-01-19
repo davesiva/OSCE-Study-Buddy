@@ -624,7 +624,8 @@ const styles = StyleSheet.create({
   },
   caseSelectorContainer: {
     marginBottom: Spacing.sm,
-    zIndex: 100,
+    zIndex: 1000,
+    position: "relative",
   },
   caseSelector: {
     flexDirection: "row",
@@ -651,7 +652,7 @@ const styles = StyleSheet.create({
     right: 0,
     marginTop: 4,
     borderRadius: BorderRadius.md,
-    overflow: "hidden",
+    zIndex: 1000,
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -668,7 +669,10 @@ const styles = StyleSheet.create({
     }),
   },
   caseOption: {
-    padding: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    minHeight: 56,
+    justifyContent: "center",
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "rgba(0,0,0,0.1)",
   },
