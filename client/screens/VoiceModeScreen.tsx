@@ -6,6 +6,7 @@ import {
   Platform,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 
 interface VoiceMessage {
@@ -35,7 +36,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, apiRequest } from "@/lib/query-client";
 
 interface CaseData {
   case_id: string;
@@ -274,6 +275,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
   const [assistantTranscript, setAssistantTranscript] = useState("");
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isAssessing, setIsAssessing] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -539,6 +541,36 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     }
   };
 
+  const handleGetAssessment = async () => {
+    if (!caseData || messages.length === 0 || isAssessing) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsAssessing(true);
+
+    try {
+      const response = await apiRequest("POST", "/api/assess", {
+        messages: messages.map((m) => ({ role: m.role, content: m.text })),
+        caseData: caseData,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        navigation.navigate("Assessment", {
+          assessment: data.assessment,
+          hasCustomCriteria: data.hasCustomCriteria,
+          patientName: caseData.patient_name,
+          chiefComplaint: caseData.chief_complaint,
+        });
+      }
+    } catch (error) {
+      console.error("Error getting assessment:", error);
+      setError("Failed to get assessment. Please try again.");
+    } finally {
+      setIsAssessing(false);
+    }
+  };
+
   return (
     <ThemedView style={styles.container}>
       <View style={[styles.content, { paddingTop: headerHeight + Spacing.xl }]}>
@@ -611,6 +643,27 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
             >
               <Feather name="x" size={24} color="#FFFFFF" />
               <ThemedText style={styles.endCallText}>End</ThemedText>
+            </Pressable>
+          ) : null}
+
+          {!isConnected && messages.length > 0 ? (
+            <Pressable
+              onPress={handleGetAssessment}
+              disabled={isAssessing}
+              style={[
+                styles.assessButton,
+                { backgroundColor: "#10B981" },
+                isAssessing && { opacity: 0.6 },
+              ]}
+            >
+              {isAssessing ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Feather name="clipboard" size={20} color="#FFFFFF" />
+              )}
+              <ThemedText style={styles.assessButtonText}>
+                {isAssessing ? "Assessing..." : "Get Assessment"}
+              </ThemedText>
             </Pressable>
           ) : null}
         </View>
@@ -804,6 +857,19 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
   },
   endCallText: {
+    color: "#FFFFFF",
+    marginLeft: Spacing.sm,
+    fontWeight: "600",
+  },
+  assessButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: BorderRadius.full,
+  },
+  assessButtonText: {
     color: "#FFFFFF",
     marginLeft: Spacing.sm,
     fontWeight: "600",
