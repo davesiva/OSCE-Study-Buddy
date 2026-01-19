@@ -90,7 +90,7 @@ export default function HomeScreen() {
       >
         <View style={[styles.welcomeCard, { backgroundColor: theme.backgroundDefault }]}>
           <ThemedText type="h3" style={styles.welcomeTitle}>
-            Welcome, Future Doctor!
+            Welcome
           </ThemedText>
           <ThemedText style={styles.welcomeText}>
             Practice your clinical skills with AI-powered patient simulations.
