@@ -21,6 +21,5 @@
   "allergies": "No known drug allergies",
   "script_instructions": "You are playing Mr. Tan Ah Kow, a 55-year-old Chinese Singaporean man who works as a taxi driver. You are anxious and scared about your chest pain. You should describe your pain as 'very tight, like someone sitting on my chest'. You are cooperative but visibly distressed. When asked about your lifestyle, you are a bit defensive about your smoking habit.",
   "secret_info": "The patient has been having similar but milder episodes over the past week but ignored them. He also skipped his medications for the past 3 days because he ran out.",
-  "singlish_level": "moderate",
   "expected_diagnosis": "Acute Coronary Syndrome / STEMI"
 }

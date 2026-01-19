@@ -22,7 +22,6 @@ interface CaseData {
   allergies: string;
   script_instructions: string;
   secret_info: string;
-  singlish_level: string;
   expected_diagnosis: string;
   menstrual_history?: string;
   assessment_criteria?: string;
@@ -33,17 +32,7 @@ interface ChatMessage {
   content: string;
 }
 
-function getSinglishInstruction(level: string): string {
-  if (level === "high") {
-    return `Use heavy Singlish expressions naturally. Include common phrases like 'lah', 'leh', 'lor', 'sia', 'can or not', 'how come', 'aiyo', 'walao'. Mix English with occasional Chinese/Malay words. Speak in a very casual, local Singaporean manner.`;
-  } else if (level === "moderate") {
-    return `Use moderate Singlish. Include occasional 'lah', 'leh', 'lor' at the end of sentences. Speak in a casual but understandable Singaporean English style. Don't overdo the slang.`;
-  }
-  return `Speak in standard English with minimal Singlish. You may occasionally use 'lah' or 'okay' in a Singaporean way, but keep the language clear and professional.`;
-}
-
 function buildSystemPrompt(caseData: CaseData): string {
-  const singlishInstruction = getSinglishInstruction(caseData.singlish_level || "low");
   
   return `You are a standardized patient in an OSCE (Objective Structured Clinical Examination) simulation for medical students.
 
@@ -74,7 +63,7 @@ SECRET INFORMATION (only reveal if directly asked relevant questions):
 ${caseData.secret_info || "None"}
 
 LANGUAGE STYLE:
-${singlishInstruction}
+Speak in clear, natural English. Be conversational and friendly.
 
 IMPORTANT RULES:
 1. Stay in character at all times as the patient

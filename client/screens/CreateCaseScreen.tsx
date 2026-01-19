@@ -48,7 +48,6 @@ interface CaseFormData {
   allergies: string;
   script_instructions: string;
   secret_info: string;
-  singlish_level: string;
   expected_diagnosis: string;
 }
 
@@ -68,7 +67,6 @@ const initialFormData: CaseFormData = {
   allergies: "",
   script_instructions: "",
   secret_info: "",
-  singlish_level: "moderate",
   expected_diagnosis: "",
 };
 
@@ -253,7 +251,6 @@ export default function CreateCaseScreen() {
         allergies: data.allergies || "",
         script_instructions: data.script_instructions || "",
         secret_info: data.secret_info || "",
-        singlish_level: "moderate",
         expected_diagnosis: data.expected_diagnosis || "",
       });
 
@@ -333,7 +330,6 @@ export default function CreateCaseScreen() {
       allergies: formData.allergies.trim() || "No known allergies",
       script_instructions: formData.script_instructions.trim(),
       secret_info: formData.secret_info.trim() || "None",
-      singlish_level: formData.singlish_level,
       expected_diagnosis: formData.expected_diagnosis.trim() || "To be determined",
       is_custom: true,
     };
@@ -652,25 +648,6 @@ export default function CreateCaseScreen() {
         placeholder="Information the patient only reveals when asked specific questions..."
         multiline
       />
-      <ThemedText style={styles.inputLabel}>Singlish Level</ThemedText>
-      <View style={styles.optionRow}>
-        <OptionButton
-          label="Low"
-          selected={formData.singlish_level === "low"}
-          onPress={() => updateField("singlish_level", "low")}
-        />
-        <OptionButton
-          label="Moderate"
-          selected={formData.singlish_level === "moderate"}
-          onPress={() => updateField("singlish_level", "moderate")}
-        />
-        <OptionButton
-          label="High"
-          selected={formData.singlish_level === "high"}
-          onPress={() => updateField("singlish_level", "high")}
-        />
-      </View>
-      <View style={{ height: Spacing.lg }} />
       <FormInput
         label="Expected Diagnosis"
         value={formData.expected_diagnosis}
@@ -728,12 +705,6 @@ export default function CreateCaseScreen() {
             </ThemedText>
           </View>
 
-          <View style={styles.previewSection}>
-            <ThemedText style={styles.previewLabel}>Singlish Level</ThemedText>
-            <ThemedText style={{ textTransform: "capitalize" }}>
-              {caseObj.singlish_level}
-            </ThemedText>
-          </View>
         </View>
 
         <ThemedText type="h4" style={styles.saveTitle}>

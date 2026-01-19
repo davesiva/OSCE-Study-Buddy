@@ -43,7 +43,6 @@ interface CaseData {
   allergies: string;
   script_instructions: string;
   secret_info: string;
-  singlish_level: string;
   expected_diagnosis: string;
 }
 

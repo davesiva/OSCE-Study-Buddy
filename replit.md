@@ -43,7 +43,7 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 - Step 1: Patient info (name, age, gender, complaint)
 - Step 2: Vital signs
 - Step 3: Medical history
-- Step 4: AI acting instructions and Singlish level
+- Step 4: AI acting instructions
 - Step 5: Preview and save options
 - Save locally (AsyncStorage) or upload to server
 - Validation on each step
@@ -61,7 +61,6 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 - Real-time chat with AI patient
 - Voice Mode button for natural voice conversations
 - Chat history persisted via AsyncStorage
-- Singlish language support (configurable per case)
 - **Get Assessment** button to evaluate clerking performance after session
 
 ### Post-Session Assessment
@@ -119,7 +118,6 @@ A mobile-first web application for medical students to practice OSCE (Objective 
   "allergies": "Allergy info",
   "script_instructions": "How AI should act",
   "secret_info": "Info revealed only when asked",
-  "singlish_level": "low|moderate|high",
   "assessment_criteria": "Optional: Custom assessment criteria from calibration document"
 }
 ```
