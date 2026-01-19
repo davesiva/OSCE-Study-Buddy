@@ -25,6 +25,7 @@ interface CaseData {
   singlish_level: string;
   expected_diagnosis: string;
   menstrual_history?: string;
+  assessment_criteria?: string;
 }
 
 interface ChatMessage {
@@ -303,6 +304,173 @@ ${content}`;
     } catch (error) {
       console.error("Error parsing case:", error);
       res.status(500).json({ error: "Failed to parse the document. Please try again." });
+    }
+  });
+
+  // Parse calibration/assessment document
+  app.post("/api/parse-calibration", async (req: Request, res: Response) => {
+    try {
+      const { content } = req.body as { content: string };
+      
+      if (!content) {
+        res.status(400).json({ error: "Calibration document content is required" });
+        return;
+      }
+
+      const prompt = `You are an expert at parsing OSCE (Objective Structured Clinical Examination) calibration and assessment documents.
+Extract the assessment criteria from the following document and return it as a structured text format that can be used to evaluate a medical student's performance.
+
+The document may contain:
+- Grading domains (History Taking, Physical Examination, Problem Definition, etc.)
+- Pass/fail criteria
+- Expected behaviors and skills
+- Marking guidelines
+
+Extract and organize the assessment criteria in a clear, structured format that includes:
+1. Each domain being assessed
+2. What constitutes a pass, fail, or distinction for each domain
+3. Key things the examiner should look for
+4. Any red flags that indicate poor performance
+
+Return the assessment criteria as clear, readable text (not JSON).
+
+Document content:
+${content}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 2000,
+        temperature: 0.3,
+      });
+
+      const assessmentCriteria = response.choices[0]?.message?.content || "";
+      
+      res.json({ success: true, assessment_criteria: assessmentCriteria });
+    } catch (error) {
+      console.error("Error parsing calibration:", error);
+      res.status(500).json({ error: "Failed to parse calibration document" });
+    }
+  });
+
+  // Generate assessment for a clerking session
+  app.post("/api/assess", async (req: Request, res: Response) => {
+    try {
+      const { messages, caseData } = req.body as {
+        messages: ChatMessage[];
+        caseData: CaseData;
+      };
+
+      if (!messages || messages.length === 0) {
+        res.status(400).json({ error: "No conversation to assess" });
+        return;
+      }
+
+      const conversationText = messages
+        .map((m) => `${m.role === "user" ? "Student" : "Patient"}: ${m.content}`)
+        .join("\n");
+
+      let assessmentPrompt = `You are an experienced OSCE examiner assessing a medical student's clerking performance.
+
+CASE INFORMATION:
+- Patient: ${caseData.patient_name}, ${caseData.age} years old, ${caseData.gender}
+- Chief Complaint: ${caseData.chief_complaint}
+- Expected Diagnosis: ${caseData.expected_diagnosis || "Not specified"}
+
+CONVERSATION TRANSCRIPT:
+${conversationText}
+
+`;
+
+      if (caseData.assessment_criteria) {
+        assessmentPrompt += `
+ASSESSMENT CRITERIA (from calibration document):
+${caseData.assessment_criteria}
+
+Based on the above criteria, provide a detailed assessment of the student's performance.
+`;
+      } else {
+        assessmentPrompt += `
+Assess the student's performance based on standard OSCE domains:
+1. History Taking Skills - Use of open/closed questions, pacing, allowing patient to speak
+2. Relevance of History - Coverage of presenting complaint, red flags, relevant systems review
+3. Physical Examination Skills - Appropriate examination approach (if discussed)
+4. Problem Definition - Identification of key issues and differential diagnoses
+5. Management Plan - Appropriate investigations and treatment suggestions
+6. Communication Skills - Clarity, empathy, rapport building, patient education
+7. Professionalism - Respect, ethics, patient autonomy
+`;
+      }
+
+      assessmentPrompt += `
+Provide your assessment in the following format:
+
+OVERALL GRADE: [Distinction / Pass / Borderline / Fail]
+
+DOMAIN SCORES:
+[For each relevant domain, provide: Domain Name - Grade - Brief comment]
+
+STRENGTHS:
+[List 2-3 things the student did well]
+
+AREAS FOR IMPROVEMENT:
+[List 2-3 specific areas where the student could improve]
+
+SPECIFIC FEEDBACK:
+[Provide detailed, constructive feedback on the student's approach]
+
+MISSED OPPORTUNITIES:
+[List any important questions or topics the student failed to explore]`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: assessmentPrompt }],
+        max_tokens: 1500,
+        temperature: 0.4,
+      });
+
+      const assessment = response.choices[0]?.message?.content || "Unable to generate assessment.";
+      
+      res.json({ 
+        success: true, 
+        assessment,
+        hasCustomCriteria: !!caseData.assessment_criteria
+      });
+    } catch (error) {
+      console.error("Error generating assessment:", error);
+      res.status(500).json({ error: "Failed to generate assessment" });
+    }
+  });
+
+  // Update case with assessment criteria
+  app.patch("/api/cases/:caseId/criteria", (req: Request, res: Response) => {
+    try {
+      const { caseId } = req.params;
+      const { assessment_criteria } = req.body as { assessment_criteria: string };
+      
+      const casesDir = path.resolve(process.cwd(), "cases");
+      
+      if (fs.existsSync(casesDir)) {
+        const files = fs.readdirSync(casesDir);
+        for (const file of files) {
+          if (file.endsWith(".json")) {
+            const filePath = path.join(casesDir, file);
+            const content = fs.readFileSync(filePath, "utf-8");
+            const caseData = JSON.parse(content) as CaseData;
+            if (caseData.case_id === caseId) {
+              caseData.assessment_criteria = assessment_criteria;
+              fs.writeFileSync(filePath, JSON.stringify(caseData, null, 2));
+              res.json({ success: true });
+              return;
+            }
+          }
+        }
+      }
+      
+      res.status(404).json({ error: "Case not found" });
+    } catch (error) {
+      console.error("Error updating case criteria:", error);
+      res.status(500).json({ error: "Failed to update assessment criteria" });
     }
   });
 
