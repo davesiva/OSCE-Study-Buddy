@@ -122,7 +122,7 @@ export function setupRealtimeWebSocket(server: Server): void {
               session: {
                 modalities: ["text", "audio"],
                 instructions: buildVoiceInstructions(caseData!),
-                voice: "shimmer",
+                voice: "coral",
                 input_audio_format: "pcm16",
                 output_audio_format: "pcm16",
                 input_audio_transcription: {
