@@ -329,7 +329,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
               source.connect(processor);
-              processor.connect(audioContext.destination);
+              processor.connect(audioContext.createGain());
 
               processor.onaudioprocess = (e) => {
                 if (wsRef.current?.readyState === WebSocket.OPEN) {
