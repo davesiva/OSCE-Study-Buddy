@@ -27,6 +27,7 @@ import Animated, {
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
+import { MedicalIcon, MedicalIconType } from "@/components/MedicalIcons";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { getApiUrl } from "@/lib/query-client";
 
@@ -184,17 +185,17 @@ export default function CreateCaseScreen() {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<"easy" | "medium" | "challenging">("medium");
 
-  const SPECIALTIES = [
-    { id: "cardiology", label: "Cardiology", icon: "heart" },
-    { id: "respiratory", label: "Respiratory", icon: "wind" },
-    { id: "gastroenterology", label: "Gastroenterology", icon: "activity" },
-    { id: "neurology", label: "Neurology", icon: "zap" },
-    { id: "renal", label: "Renal", icon: "droplet" },
-    { id: "endocrine", label: "Endocrine", icon: "thermometer" },
-    { id: "msk", label: "Musculoskeletal", icon: "move" },
-    { id: "obgyn", label: "O&G", icon: "users" },
-    { id: "infectious", label: "Infectious Disease", icon: "alert-circle" },
-    { id: "psychiatry", label: "Psychiatry", icon: "smile" },
+  const SPECIALTIES: { id: MedicalIconType; label: string }[] = [
+    { id: "cardiology", label: "Cardiology" },
+    { id: "respiratory", label: "Respiratory" },
+    { id: "gastroenterology", label: "Gastroenterology" },
+    { id: "neurology", label: "Neurology" },
+    { id: "renal", label: "Renal" },
+    { id: "endocrine", label: "Endocrine" },
+    { id: "msk", label: "Musculoskeletal" },
+    { id: "obgyn", label: "O&G" },
+    { id: "infectious", label: "Infectious Disease" },
+    { id: "psychiatry", label: "Psychiatry" },
   ];
 
   const updateField = (field: keyof CaseFormData, value: string) => {
@@ -594,8 +595,8 @@ export default function CreateCaseScreen() {
                 },
               ]}
             >
-              <Feather
-                name={specialty.icon as any}
+              <MedicalIcon
+                type={specialty.id}
                 size={14}
                 color={selectedSpecialty === specialty.id ? "#FFFFFF" : theme.text}
               />
