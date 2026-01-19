@@ -170,6 +170,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg,
+    flexGrow: 1,
   },
   welcomeCard: {
     padding: Spacing.xl,
