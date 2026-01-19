@@ -303,8 +303,9 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
-      const baseUrl = getApiUrl();
+      const baseUrl = getApiUrl().replace(/\/$/, "");
       const wsUrl = baseUrl.replace(/^http/, "ws") + "/api/realtime";
+      console.log("Connecting to WebSocket:", wsUrl);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
