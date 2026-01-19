@@ -291,6 +291,7 @@ export default function OSCESimulatorScreen() {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isAssessing, setIsAssessing] = useState(false);
 
   const sendScale = useSharedValue(1);
 
@@ -419,6 +420,35 @@ export default function OSCESimulatorScreen() {
     }
   };
 
+  const handleGetAssessment = async () => {
+    if (!selectedCase || messages.length === 0 || isAssessing) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsAssessing(true);
+
+    try {
+      const response = await apiRequest("POST", "/api/assess", {
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        caseData: selectedCase,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        navigation.navigate("Assessment", {
+          assessment: data.assessment,
+          hasCustomCriteria: data.hasCustomCriteria,
+          patientName: selectedCase.patient_name,
+          chiefComplaint: selectedCase.chief_complaint,
+        });
+      }
+    } catch (error) {
+      console.error("Error getting assessment:", error);
+    } finally {
+      setIsAssessing(false);
+    }
+  };
+
   const handleSendPressIn = () => {
     sendScale.value = withSpring(0.9);
   };
@@ -468,6 +498,27 @@ export default function OSCESimulatorScreen() {
               >
                 <Feather name="mic" size={16} color="#FFFFFF" />
                 <ThemedText style={styles.voiceModeButtonText}>Voice Mode</ThemedText>
+              </Pressable>
+            ) : null}
+
+            {messages.length > 0 ? (
+              <Pressable
+                onPress={handleGetAssessment}
+                disabled={isAssessing}
+                style={[
+                  styles.assessButton,
+                  { backgroundColor: "#10B981" },
+                  isAssessing && { opacity: 0.6 },
+                ]}
+              >
+                {isAssessing ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Feather name="clipboard" size={16} color="#FFFFFF" />
+                )}
+                <ThemedText style={styles.assessButtonText}>
+                  {isAssessing ? "Assessing..." : "Get Assessment"}
+                </ThemedText>
               </Pressable>
             ) : null}
 
@@ -705,6 +756,19 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.full,
   },
   voiceModeButtonText: {
+    marginLeft: Spacing.xs,
+    fontSize: 13,
+    color: "#FFFFFF",
+    fontWeight: "500",
+  },
+  assessButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.full,
+  },
+  assessButtonText: {
     marginLeft: Spacing.xs,
     fontSize: 13,
     color: "#FFFFFF",

@@ -6,6 +6,7 @@ import OSCESimulatorScreen from "@/screens/OSCESimulatorScreen";
 import FeedbackScreen from "@/screens/FeedbackScreen";
 import CreateCaseScreen from "@/screens/CreateCaseScreen";
 import VoiceModeScreen from "@/screens/VoiceModeScreen";
+import AssessmentScreen from "@/screens/AssessmentScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 
@@ -15,6 +16,12 @@ export type RootStackParamList = {
   Feedback: undefined;
   CreateCase: undefined;
   VoiceMode: { caseData?: object };
+  Assessment: {
+    assessment: string;
+    hasCustomCriteria: boolean;
+    patientName: string;
+    chiefComplaint: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -57,6 +64,13 @@ export default function RootStackNavigator() {
         component={VoiceModeScreen}
         options={{
           headerTitle: "Voice Mode",
+        }}
+      />
+      <Stack.Screen
+        name="Assessment"
+        component={AssessmentScreen}
+        options={{
+          headerTitle: "Assessment",
         }}
       />
     </Stack.Navigator>
