@@ -152,7 +152,7 @@ export default function HomeScreen() {
             <View style={styles.infoContent}>
               <ThemedText style={styles.infoTitle}>Performance Assessment</ThemedText>
               <ThemedText style={styles.infoText}>
-                Get AI-powered feedback on your clerking skills after each session
+                Get feedback on your clerking after each session
               </ThemedText>
             </View>
           </View>
