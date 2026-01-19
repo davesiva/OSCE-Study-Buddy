@@ -1,7 +1,9 @@
 import React from "react";
-import { View, StyleSheet, Image } from "react-native";
+import { View, StyleSheet } from "react-native";
+import { Feather } from "@expo/vector-icons";
 
 import { ThemedText } from "@/components/ThemedText";
+import { useTheme } from "@/hooks/useTheme";
 import { Spacing } from "@/constants/theme";
 
 interface HeaderTitleProps {
@@ -9,14 +11,16 @@ interface HeaderTitleProps {
 }
 
 export function HeaderTitle({ title }: HeaderTitleProps) {
+  const { theme } = useTheme();
+
   return (
     <View style={styles.container}>
-      <Image
-        source={require("../../assets/images/icon.png")}
-        style={styles.icon}
-        resizeMode="contain"
-      />
-      <ThemedText style={styles.title}>{title}</ThemedText>
+      <View style={[styles.iconContainer, { backgroundColor: theme.link }]}>
+        <Feather name="activity" size={16} color="#FFFFFF" />
+      </View>
+      <ThemedText style={styles.title} numberOfLines={1}>
+        {title}
+      </ThemedText>
     </View>
   );
 }
@@ -27,9 +31,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-start",
   },
-  icon: {
+  iconContainer: {
     width: 28,
     height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: Spacing.sm,
   },
   title: {

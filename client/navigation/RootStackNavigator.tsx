@@ -1,12 +1,16 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import MainTabNavigator from "@/navigation/MainTabNavigator";
-import ModalScreen from "@/screens/ModalScreen";
+
+import HomeScreen from "@/screens/HomeScreen";
+import OSCESimulatorScreen from "@/screens/OSCESimulatorScreen";
+import FeedbackScreen from "@/screens/FeedbackScreen";
+import { HeaderTitle } from "@/components/HeaderTitle";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 
 export type RootStackParamList = {
-  Main: undefined;
-  Modal: undefined;
+  Home: undefined;
+  OSCESimulator: undefined;
+  Feedback: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -17,16 +21,24 @@ export default function RootStackNavigator() {
   return (
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen
-        name="Main"
-        component={MainTabNavigator}
-        options={{ headerShown: false }}
+        name="Home"
+        component={HomeScreen}
+        options={{
+          headerTitle: () => <HeaderTitle title="Medical Student Assistant" />,
+        }}
       />
       <Stack.Screen
-        name="Modal"
-        component={ModalScreen}
+        name="OSCESimulator"
+        component={OSCESimulatorScreen}
         options={{
-          presentation: "modal",
-          headerTitle: "Modal",
+          headerTitle: "OSCE Simulator",
+        }}
+      />
+      <Stack.Screen
+        name="Feedback"
+        component={FeedbackScreen}
+        options={{
+          headerTitle: "Feedback",
         }}
       />
     </Stack.Navigator>
