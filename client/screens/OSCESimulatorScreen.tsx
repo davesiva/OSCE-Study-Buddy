@@ -60,18 +60,21 @@ function CaseSelector({
   cases,
   selectedCase,
   onSelect,
+  isOpen,
+  onOpenChange,
 }: {
   cases: CaseData[];
   selectedCase: CaseData | null;
   onSelect: (caseData: CaseData) => void;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
 }) {
   const { theme } = useTheme();
-  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <View style={styles.caseSelectorContainer}>
       <Pressable
-        onPress={() => setIsOpen(!isOpen)}
+        onPress={() => onOpenChange(!isOpen)}
         style={[
           styles.caseSelector,
           { backgroundColor: theme.backgroundDefault },
@@ -109,7 +112,7 @@ function CaseSelector({
                 key={caseData.case_id}
                 onPress={() => {
                   onSelect(caseData);
-                  setIsOpen(false);
+                  onOpenChange(false);
                 }}
                 style={[
                   styles.caseOption,
@@ -298,6 +301,7 @@ export default function OSCESimulatorScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isAssessing, setIsAssessing] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const sendScale = useSharedValue(1);
 
@@ -479,6 +483,13 @@ export default function OSCESimulatorScreen() {
         behavior="padding"
         keyboardVerticalOffset={0}
       >
+        {isDropdownOpen ? (
+          <Pressable
+            style={styles.backdrop}
+            onPress={() => setIsDropdownOpen(false)}
+          />
+        ) : null}
+
         <View
           style={[styles.header, { paddingTop: headerHeight + Spacing.sm }]}
         >
@@ -486,6 +497,8 @@ export default function OSCESimulatorScreen() {
             cases={cases}
             selectedCase={selectedCase}
             onSelect={handleCaseSelect}
+            isOpen={isDropdownOpen}
+            onOpenChange={setIsDropdownOpen}
           />
 
           {selectedCase ? <PatientDetails caseData={selectedCase} /> : null}
@@ -624,6 +637,14 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
+  },
+  backdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
   },
   header: {
     paddingHorizontal: Spacing.lg,
