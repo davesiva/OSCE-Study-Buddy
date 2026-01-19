@@ -147,12 +147,12 @@ export default function HomeScreen() {
 
           <View style={styles.infoItem}>
             <View style={[styles.infoIcon, { backgroundColor: "#F59E0B20" }]}>
-              <Feather name="zap" size={20} color="#F59E0B" />
+              <Feather name="clipboard" size={20} color="#F59E0B" />
             </View>
             <View style={styles.infoContent}>
-              <ThemedText style={styles.infoTitle}>Instant Feedback</ThemedText>
+              <ThemedText style={styles.infoTitle}>Performance Assessment</ThemedText>
               <ThemedText style={styles.infoText}>
-                Chat with patients in real-time
+                Get AI-powered feedback on your clerking skills after each session
               </ThemedText>
             </View>
           </View>
