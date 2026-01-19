@@ -628,6 +628,7 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
+    zIndex: 1000,
   },
   caseSelectorContainer: {
     marginBottom: Spacing.sm,
