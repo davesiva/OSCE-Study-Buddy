@@ -62,6 +62,15 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 - Voice Mode button for natural voice conversations
 - Chat history persisted via AsyncStorage
 - Singlish language support (configurable per case)
+- **Get Assessment** button to evaluate clerking performance after session
+
+### Post-Session Assessment
+- AI-powered evaluation of student's clerking performance
+- Supports uploaded calibration/assessment guidelines (PDFs)
+- Falls back to standard OSCE assessment criteria when no calibration is provided
+- Assessment domains include: History Taking, Physical Examination, Problem Definition, Investigations, Management, Communication, and Professionalism
+- Displays overall grade (Distinction/Pass/Borderline/Fail)
+- Provides detailed feedback with strengths, areas for improvement, and missed opportunities
 
 ### Voice Mode (Web only)
 - Real-time voice conversations with AI patient using OpenAI Realtime API
@@ -83,6 +92,9 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 - `GET /api/cases/:caseId` - Get specific case details
 - `POST /api/cases` - Save a custom case (upload)
 - `POST /api/parse-case` - Parse OSCE document content using AI
+- `POST /api/parse-calibration` - Parse calibration/assessment document using AI
+- `POST /api/assess` - Generate AI assessment based on conversation history
+- `PATCH /api/cases/:caseId/criteria` - Update case with assessment criteria
 - `POST /api/chat` - Send message to AI patient
 - `POST /api/feedback` - Submit user feedback
 - `GET /api/health` - Health check
@@ -107,7 +119,8 @@ A mobile-first web application for medical students to practice OSCE (Objective 
   "allergies": "Allergy info",
   "script_instructions": "How AI should act",
   "secret_info": "Info revealed only when asked",
-  "singlish_level": "low|moderate|high"
+  "singlish_level": "low|moderate|high",
+  "assessment_criteria": "Optional: Custom assessment criteria from calibration document"
 }
 ```
 
