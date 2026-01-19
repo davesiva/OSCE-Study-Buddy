@@ -571,7 +571,7 @@ export default function CreateCaseScreen() {
           <View style={styles.methodContent}>
             <ThemedText style={styles.methodTitle}>Generate with AI</ThemedText>
             <ThemedText style={styles.methodSubtitle}>
-              Create a Singapore-focused OSCE case
+              Draft a comprehensive OSCE case with AI
             </ThemedText>
           </View>
         </View>
