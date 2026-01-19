@@ -628,9 +628,6 @@ export default function CreateCaseScreen() {
             <ThemedText style={[styles.difficultyText, { color: selectedDifficulty === "easy" ? "#FFFFFF" : theme.text }]}>
               Easy
             </ThemedText>
-            <ThemedText style={[styles.difficultyDesc, { color: selectedDifficulty === "easy" ? "#FFFFFF" : theme.tabIconDefault }]}>
-              Textbook
-            </ThemedText>
           </Pressable>
           <Pressable
             onPress={() => {
@@ -648,9 +645,6 @@ export default function CreateCaseScreen() {
             <ThemedText style={[styles.difficultyText, { color: selectedDifficulty === "medium" ? "#FFFFFF" : theme.text }]}>
               Medium
             </ThemedText>
-            <ThemedText style={[styles.difficultyDesc, { color: selectedDifficulty === "medium" ? "#FFFFFF" : theme.tabIconDefault }]}>
-              Atypical
-            </ThemedText>
           </Pressable>
           <Pressable
             onPress={() => {
@@ -667,9 +661,6 @@ export default function CreateCaseScreen() {
           >
             <ThemedText style={[styles.difficultyText, { color: selectedDifficulty === "challenging" ? "#FFFFFF" : theme.text }]}>
               Hard
-            </ThemedText>
-            <ThemedText style={[styles.difficultyDesc, { color: selectedDifficulty === "challenging" ? "#FFFFFF" : theme.tabIconDefault }]}>
-              Obscure
             </ThemedText>
           </Pressable>
         </View>
