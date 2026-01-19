@@ -146,18 +146,6 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.infoItem}>
-            <View style={[styles.infoIcon, { backgroundColor: "#10B98120" }]}>
-              <Feather name="globe" size={20} color="#10B981" />
-            </View>
-            <View style={styles.infoContent}>
-              <ThemedText style={styles.infoTitle}>Singlish Support</ThemedText>
-              <ThemedText style={styles.infoText}>
-                Patients speak in authentic Singaporean English
-              </ThemedText>
-            </View>
-          </View>
-
-          <View style={styles.infoItem}>
             <View style={[styles.infoIcon, { backgroundColor: "#F59E0B20" }]}>
               <Feather name="zap" size={20} color="#F59E0B" />
             </View>
