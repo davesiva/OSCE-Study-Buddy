@@ -178,8 +178,23 @@ export default function CreateCaseScreen() {
   const [formData, setFormData] = useState<CaseFormData>(initialFormData);
   const [isSaving, setIsSaving] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [saveSuccess, setSaveSuccess] = useState<{ type: "local" | "upload"; name: string } | null>(null);
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<"easy" | "medium" | "challenging">("medium");
+
+  const SPECIALTIES = [
+    { id: "cardiology", label: "Cardiology", icon: "heart" },
+    { id: "respiratory", label: "Respiratory", icon: "wind" },
+    { id: "gastroenterology", label: "Gastroenterology", icon: "activity" },
+    { id: "neurology", label: "Neurology", icon: "zap" },
+    { id: "renal", label: "Renal", icon: "droplet" },
+    { id: "endocrine", label: "Endocrine", icon: "thermometer" },
+    { id: "msk", label: "Musculoskeletal", icon: "move" },
+    { id: "obgyn", label: "O&G", icon: "users" },
+    { id: "infectious", label: "Infectious Disease", icon: "alert-circle" },
+  ];
 
   const updateField = (field: keyof CaseFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -189,6 +204,64 @@ export default function CreateCaseScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setFormData(initialFormData);
     setCurrentStep(1);
+  };
+
+  const handleGenerateCase = async () => {
+    if (!selectedSpecialty) {
+      setErrors(["Please select a specialty"]);
+      return;
+    }
+
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setIsGenerating(true);
+      setErrors([]);
+
+      const response = await fetch(new URL("/api/generate-case", getApiUrl()).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          specialty: selectedSpecialty, 
+          difficulty: selectedDifficulty 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate case");
+      }
+
+      const { data } = await response.json();
+
+      setFormData({
+        patient_name: data.patient_name || "",
+        age: String(data.age || ""),
+        gender: data.gender || "Male",
+        chief_complaint: data.chief_complaint || "",
+        presenting_history: data.presenting_history || "",
+        blood_pressure: data.blood_pressure || "",
+        heart_rate: data.heart_rate || "",
+        respiratory_rate: data.respiratory_rate || "",
+        temperature: data.temperature || "",
+        spo2: data.spo2 || "",
+        past_medical_history: Array.isArray(data.past_medical_history) 
+          ? data.past_medical_history.join("\n") 
+          : data.past_medical_history || "",
+        social_history: data.social_history || "",
+        allergies: data.allergies || "",
+        script_instructions: data.script_instructions || "",
+        secret_info: data.secret_info || "",
+        expected_diagnosis: data.expected_diagnosis || "",
+      });
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setCurrentStep(1);
+    } catch (error) {
+      console.error("Error generating case:", error);
+      setErrors(["Failed to generate case. Please try again."]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleImportPDF = async () => {
@@ -438,7 +511,7 @@ export default function CreateCaseScreen() {
       </ThemedText>
       
       <ThemedText style={styles.methodDescription}>
-        Choose to start from scratch or import from an existing OSCE document.
+        Choose to start from scratch, import from a document, or generate with AI.
       </ThemedText>
 
       <Pressable
@@ -490,11 +563,142 @@ export default function CreateCaseScreen() {
         )}
       </Pressable>
 
-      <View style={[styles.infoBox, { backgroundColor: theme.backgroundDefault }]}>
-        <Feather name="info" size={16} color={theme.tabIconDefault} />
-        <ThemedText style={styles.infoText}>
-          When importing, the AI will extract patient info, vitals, history, and acting instructions from your OSCE documents.
-        </ThemedText>
+      <View style={[styles.generateSection, { backgroundColor: theme.backgroundDefault }]}>
+        <View style={styles.generateHeader}>
+          <View style={[styles.methodIcon, { backgroundColor: "#10B98120" }]}>
+            <Feather name="cpu" size={28} color="#10B981" />
+          </View>
+          <View style={styles.methodContent}>
+            <ThemedText style={styles.methodTitle}>Generate with AI</ThemedText>
+            <ThemedText style={styles.methodSubtitle}>
+              Create a Singapore-focused OSCE case
+            </ThemedText>
+          </View>
+        </View>
+
+        <ThemedText style={styles.selectorLabel}>Select Specialty</ThemedText>
+        <View style={styles.specialtyGrid}>
+          {SPECIALTIES.map((specialty) => (
+            <Pressable
+              key={specialty.id}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setSelectedSpecialty(specialty.id);
+              }}
+              style={[
+                styles.specialtyChip,
+                {
+                  backgroundColor: selectedSpecialty === specialty.id ? "#10B981" : theme.backgroundSecondary,
+                  borderColor: selectedSpecialty === specialty.id ? "#10B981" : theme.tabIconDefault,
+                },
+              ]}
+            >
+              <Feather
+                name={specialty.icon as any}
+                size={14}
+                color={selectedSpecialty === specialty.id ? "#FFFFFF" : theme.text}
+              />
+              <ThemedText
+                style={[
+                  styles.specialtyChipText,
+                  { color: selectedSpecialty === specialty.id ? "#FFFFFF" : theme.text },
+                ]}
+              >
+                {specialty.label}
+              </ThemedText>
+            </Pressable>
+          ))}
+        </View>
+
+        <ThemedText style={styles.selectorLabel}>Select Difficulty</ThemedText>
+        <View style={styles.difficultyRow}>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSelectedDifficulty("easy");
+            }}
+            style={[
+              styles.difficultyOption,
+              {
+                backgroundColor: selectedDifficulty === "easy" ? "#22C55E" : theme.backgroundSecondary,
+                borderColor: selectedDifficulty === "easy" ? "#22C55E" : theme.tabIconDefault,
+              },
+            ]}
+          >
+            <ThemedText style={[styles.difficultyText, { color: selectedDifficulty === "easy" ? "#FFFFFF" : theme.text }]}>
+              Easy
+            </ThemedText>
+            <ThemedText style={[styles.difficultyDesc, { color: selectedDifficulty === "easy" ? "#FFFFFF" : theme.tabIconDefault }]}>
+              Textbook
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSelectedDifficulty("medium");
+            }}
+            style={[
+              styles.difficultyOption,
+              {
+                backgroundColor: selectedDifficulty === "medium" ? "#F59E0B" : theme.backgroundSecondary,
+                borderColor: selectedDifficulty === "medium" ? "#F59E0B" : theme.tabIconDefault,
+              },
+            ]}
+          >
+            <ThemedText style={[styles.difficultyText, { color: selectedDifficulty === "medium" ? "#FFFFFF" : theme.text }]}>
+              Medium
+            </ThemedText>
+            <ThemedText style={[styles.difficultyDesc, { color: selectedDifficulty === "medium" ? "#FFFFFF" : theme.tabIconDefault }]}>
+              Atypical
+            </ThemedText>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSelectedDifficulty("challenging");
+            }}
+            style={[
+              styles.difficultyOption,
+              {
+                backgroundColor: selectedDifficulty === "challenging" ? "#EF4444" : theme.backgroundSecondary,
+                borderColor: selectedDifficulty === "challenging" ? "#EF4444" : theme.tabIconDefault,
+              },
+            ]}
+          >
+            <ThemedText style={[styles.difficultyText, { color: selectedDifficulty === "challenging" ? "#FFFFFF" : theme.text }]}>
+              Hard
+            </ThemedText>
+            <ThemedText style={[styles.difficultyDesc, { color: selectedDifficulty === "challenging" ? "#FFFFFF" : theme.tabIconDefault }]}>
+              Obscure
+            </ThemedText>
+          </Pressable>
+        </View>
+
+        <Pressable
+          onPress={handleGenerateCase}
+          disabled={isGenerating || !selectedSpecialty}
+          style={[
+            styles.generateButton,
+            {
+              backgroundColor: selectedSpecialty ? "#10B981" : theme.backgroundSecondary,
+              opacity: isGenerating ? 0.7 : 1,
+            },
+          ]}
+        >
+          {isGenerating ? (
+            <>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ThemedText style={styles.generateButtonText}>Generating Case...</ThemedText>
+            </>
+          ) : (
+            <>
+              <Feather name="zap" size={20} color={selectedSpecialty ? "#FFFFFF" : theme.tabIconDefault} />
+              <ThemedText style={[styles.generateButtonText, { color: selectedSpecialty ? "#FFFFFF" : theme.tabIconDefault }]}>
+                Generate Case
+              </ThemedText>
+            </>
+          )}
+        </Pressable>
       </View>
     </Animated.View>
   );
@@ -1073,5 +1277,72 @@ const styles = StyleSheet.create({
     fontSize: 13,
     opacity: 0.7,
     lineHeight: 18,
+  },
+  generateSection: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+  },
+  generateHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.lg,
+  },
+  selectorLabel: {
+    fontWeight: "600",
+    fontSize: 14,
+    marginBottom: Spacing.sm,
+    opacity: 0.8,
+  },
+  specialtyGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  specialtyChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: Spacing.xs,
+  },
+  specialtyChipText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  difficultyRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
+  },
+  difficultyOption: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+  },
+  difficultyText: {
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  difficultyDesc: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  generateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.sm,
+  },
+  generateButtonText: {
+    fontWeight: "600",
+    fontSize: 16,
   },
 });

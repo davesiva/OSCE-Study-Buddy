@@ -189,6 +189,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Generate AI case based on specialty and difficulty
+  app.post("/api/generate-case", async (req: Request, res: Response) => {
+    try {
+      const { specialty, difficulty } = req.body as { specialty: string; difficulty: string };
+      
+      if (!specialty) {
+        res.status(400).json({ error: "Specialty is required" });
+        return;
+      }
+
+      const specialtyNames: Record<string, string> = {
+        cardiology: "Cardiology (heart conditions)",
+        respiratory: "Respiratory (lung conditions)",
+        gastroenterology: "Gastroenterology (digestive system)",
+        neurology: "Neurology (nervous system)",
+        renal: "Renal (kidney conditions)",
+        endocrine: "Endocrinology (hormonal conditions)",
+        msk: "Musculoskeletal (bones, joints, muscles)",
+        obgyn: "Obstetrics & Gynaecology",
+        infectious: "Infectious Diseases",
+      };
+
+      const difficultyInstructions: Record<string, string> = {
+        easy: `Create a TEXTBOOK/CLASSIC presentation that medical students learn in their early years.
+- The diagnosis should be obvious with clear, classic symptoms
+- Use common conditions like: pneumonia, acute MI with classic symptoms, appendicitis, UTI, gastroenteritis, asthma exacerbation
+- Patient gives clear, straightforward answers
+- No red herrings or confusing symptoms`,
+        medium: `Create an ATYPICAL presentation of a relatively common condition.
+- The symptoms may not follow the textbook presentation
+- Include some distractors in the history that require good clinical reasoning
+- Examples: diabetic patient with silent MI, elderly with atypical pneumonia, young patient with unusual presentation
+- Patient may give vague answers initially but reveals key info when probed`,
+        challenging: `Create a CHALLENGING case with either a rare condition OR a common condition with very unusual presentation.
+- Include multiple red herrings and distractors
+- The diagnosis should be non-obvious and require careful history-taking
+- Examples: Addisonian crisis, pheochromocytoma, thyroid storm, pulmonary embolism presenting as anxiety, Guillain-Barré, aortic dissection in young patient
+- Critical information should only be revealed if student asks specific questions
+- Patient may initially present with misleading chief complaint`,
+      };
+
+      const prompt = `You are an expert medical educator creating OSCE (Objective Structured Clinical Examination) cases for medical students in Singapore.
+
+Generate a realistic patient case for the specialty: ${specialtyNames[specialty] || specialty}
+Difficulty level: ${difficulty?.toUpperCase() || "MEDIUM"}
+
+${difficultyInstructions[difficulty] || difficultyInstructions.medium}
+
+SINGAPORE CONTEXT (IMPORTANT):
+- Use Singaporean patient names and demographics (Chinese, Malay, Indian, or Eurasian names)
+- Reference local healthcare settings (polyclinic, restructured hospital like SGH, NUH, TTSH, Changi General)
+- Include locally relevant conditions: dengue fever, hand-foot-mouth disease, tuberculosis (for infectious)
+- Consider local chronic disease patterns: high prevalence of Type 2 DM, hypertension, hyperlipidaemia, chronic kidney disease, NAFLD
+- Include relevant social history: HDB living, hawker food diet, traditional Chinese medicine use, medication compliance issues
+- Use local medication brand names where appropriate
+
+Generate a complete case in the following JSON format:
+{
+  "patient_name": "Full Singaporean name with title (Mr./Mrs./Mdm./Ms.)",
+  "age": <age as number>,
+  "gender": "Male or Female",
+  "chief_complaint": "Main presenting complaint with duration",
+  "presenting_history": "Detailed history of presenting illness (3-5 sentences)",
+  "blood_pressure": "e.g., 130/85 mmHg",
+  "heart_rate": "e.g., 88 bpm",
+  "respiratory_rate": "e.g., 18/min",
+  "temperature": "e.g., 37.2°C",
+  "spo2": "e.g., 98% on room air",
+  "past_medical_history": ["Condition 1 with medications if relevant", "Condition 2"],
+  "social_history": "Occupation, smoking/alcohol status, living situation, diet",
+  "allergies": "Known allergies or 'No known drug allergies (NKDA)'",
+  "script_instructions": "Detailed acting instructions for how the AI patient should behave, their personality, emotions, and specific behaviors. Include how they should respond to different types of questions.",
+  "secret_info": "Critical information that should only be revealed if the student asks the right questions. This is key for challenging cases.",
+  "expected_diagnosis": "The actual diagnosis"
+}
+
+Return ONLY the JSON object, no additional text.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 2000,
+        temperature: 0.8,
+      });
+
+      const responseText = response.choices[0]?.message?.content || "";
+      
+      let extractedData;
+      try {
+        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        const jsonText = jsonMatch ? jsonMatch[1] : responseText;
+        extractedData = JSON.parse(jsonText.trim());
+      } catch {
+        const jsonStart = responseText.indexOf("{");
+        const jsonEnd = responseText.lastIndexOf("}");
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          extractedData = JSON.parse(responseText.slice(jsonStart, jsonEnd + 1));
+        } else {
+          throw new Error("Could not parse JSON from AI response");
+        }
+      }
+
+      res.json({ success: true, data: extractedData });
+    } catch (error) {
+      console.error("Error generating case:", error);
+      res.status(500).json({ error: "Failed to generate case. Please try again." });
+    }
+  });
+
   // Save a custom case (upload)
   app.post("/api/cases", (req: Request, res: Response) => {
     try {
