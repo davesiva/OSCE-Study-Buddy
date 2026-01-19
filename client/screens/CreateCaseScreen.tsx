@@ -556,7 +556,7 @@ export default function CreateCaseScreen() {
             <View style={styles.methodContent}>
               <ThemedText style={styles.methodTitle}>Import from Document</ThemedText>
               <ThemedText style={styles.methodSubtitle}>
-                Upload EI/CI PDF or text file
+                Upload PDF or text file
               </ThemedText>
             </View>
             <Feather name="chevron-right" size={24} color={theme.tabIconDefault} />
