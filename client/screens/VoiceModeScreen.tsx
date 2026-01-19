@@ -5,7 +5,14 @@ import {
   Pressable,
   Platform,
   Alert,
+  ScrollView,
 } from "react-native";
+
+interface VoiceMessage {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+}
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { Feather } from "@expo/vector-icons";
@@ -175,45 +182,80 @@ function PatientAvatar({ caseData, isSpeaking }: { caseData: CaseData | null; is
 }
 
 function TranscriptDisplay({ 
-  userTranscript, 
-  assistantTranscript,
+  messages,
+  currentUserTranscript,
+  currentAssistantTranscript,
   isListening,
 }: { 
-  userTranscript: string; 
-  assistantTranscript: string;
+  messages: VoiceMessage[];
+  currentUserTranscript: string;
+  currentAssistantTranscript: string;
   isListening: boolean;
 }) {
   const { theme } = useTheme();
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages, currentUserTranscript, currentAssistantTranscript]);
 
   return (
-    <View style={styles.transcriptContainer}>
-      {userTranscript ? (
+    <ScrollView 
+      ref={scrollViewRef}
+      style={styles.transcriptContainer}
+      contentContainerStyle={styles.transcriptContent}
+      showsVerticalScrollIndicator={false}
+    >
+      {messages.map((message) => (
+        <View 
+          key={message.id}
+          style={[
+            styles.transcriptBubble, 
+            message.role === "user" ? styles.userTranscript : styles.assistantTranscript,
+            { backgroundColor: message.role === "user" ? theme.link : theme.backgroundDefault }
+          ]}
+        >
+          <ThemedText style={[
+            styles.transcriptLabel, 
+            message.role === "user" ? { color: "rgba(255,255,255,0.7)" } : { opacity: 0.7 }
+          ]}>
+            {message.role === "user" ? "You:" : "Patient:"}
+          </ThemedText>
+          <ThemedText style={[
+            styles.transcriptText, 
+            message.role === "user" ? { color: "#FFFFFF" } : {}
+          ]}>
+            {message.text}
+          </ThemedText>
+        </View>
+      ))}
+      {currentUserTranscript ? (
         <View style={[styles.transcriptBubble, styles.userTranscript, { backgroundColor: theme.link }]}>
           <ThemedText style={[styles.transcriptLabel, { color: "rgba(255,255,255,0.7)" }]}>
-            You said:
+            You:
           </ThemedText>
           <ThemedText style={[styles.transcriptText, { color: "#FFFFFF" }]}>
-            {userTranscript}
+            {currentUserTranscript}
           </ThemedText>
         </View>
       ) : null}
-      {assistantTranscript ? (
+      {currentAssistantTranscript ? (
         <View style={[styles.transcriptBubble, styles.assistantTranscript, { backgroundColor: theme.backgroundDefault }]}>
           <ThemedText style={[styles.transcriptLabel, { opacity: 0.7 }]}>
             Patient:
           </ThemedText>
           <ThemedText style={styles.transcriptText}>
-            {assistantTranscript}
+            {currentAssistantTranscript}
           </ThemedText>
         </View>
       ) : null}
-      {isListening && !userTranscript ? (
+      {isListening && !currentUserTranscript ? (
         <View style={[styles.listeningIndicator, { backgroundColor: theme.backgroundDefault }]}>
           <View style={[styles.listeningDot, { backgroundColor: "#22C55E" }]} />
           <ThemedText style={styles.listeningText}>Listening...</ThemedText>
         </View>
       ) : null}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -230,6 +272,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [userTranscript, setUserTranscript] = useState("");
   const [assistantTranscript, setAssistantTranscript] = useState("");
+  const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -360,10 +403,20 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
               break;
 
             case "transcript.done":
-              if (message.role === "user") {
-                setUserTranscript(message.transcript || "");
-              } else {
-                setAssistantTranscript(message.transcript || "");
+              if (message.role === "user" && message.transcript) {
+                setMessages(prev => [...prev, {
+                  id: Date.now().toString() + "-user",
+                  role: "user",
+                  text: message.transcript,
+                }]);
+                setUserTranscript("");
+              } else if (message.role === "assistant" && message.transcript) {
+                setMessages(prev => [...prev, {
+                  id: Date.now().toString() + "-assistant",
+                  role: "assistant",
+                  text: message.transcript,
+                }]);
+                setAssistantTranscript("");
               }
               break;
 
@@ -494,8 +547,9 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
         <AudioVisualizer isActive={isListening} isSpeaking={isSpeaking} />
 
         <TranscriptDisplay
-          userTranscript={userTranscript}
-          assistantTranscript={assistantTranscript}
+          messages={messages}
+          currentUserTranscript={userTranscript}
+          currentAssistantTranscript={assistantTranscript}
           isListening={isListening}
         />
 
@@ -659,6 +713,10 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
     paddingHorizontal: Spacing.md,
+  },
+  transcriptContent: {
+    flexGrow: 1,
+    paddingBottom: Spacing.md,
   },
   transcriptBubble: {
     padding: Spacing.md,
