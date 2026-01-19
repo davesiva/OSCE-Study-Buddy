@@ -1,0 +1,26 @@
+{
+  "case_id": "chest_pain_01",
+  "patient_name": "Mr. Tan Ah Kow",
+  "age": 55,
+  "gender": "Male",
+  "chief_complaint": "Chest pain for the past 2 hours",
+  "presenting_history": "The patient was watching TV at home when he suddenly felt a tight, squeezing pain in the centre of his chest. The pain radiates to his left arm and jaw. He feels breathless and nauseous.",
+  "vitals": {
+    "blood_pressure": "160/95 mmHg",
+    "heart_rate": "95 bpm",
+    "respiratory_rate": "22 breaths/min",
+    "temperature": "36.8 C",
+    "spo2": "96% on room air"
+  },
+  "past_medical_history": [
+    "Hypertension - on Amlodipine 5mg daily",
+    "Type 2 Diabetes Mellitus - on Metformin 500mg BD",
+    "Hyperlipidaemia - on Atorvastatin 20mg ON"
+  ],
+  "social_history": "Smokes 1 pack/day for 30 years. Drinks alcohol socially.",
+  "allergies": "No known drug allergies",
+  "script_instructions": "You are playing Mr. Tan Ah Kow, a 55-year-old Chinese Singaporean man who works as a taxi driver. You are anxious and scared about your chest pain. You should describe your pain as 'very tight, like someone sitting on my chest'. You are cooperative but visibly distressed. When asked about your lifestyle, you are a bit defensive about your smoking habit.",
+  "secret_info": "The patient has been having similar but milder episodes over the past week but ignored them. He also skipped his medications for the past 3 days because he ran out.",
+  "singlish_level": "moderate",
+  "expected_diagnosis": "Acute Coronary Syndrome / STEMI"
+}

@@ -1,0 +1,25 @@
+{
+  "case_id": "abdominal_pain_01",
+  "patient_name": "Ms. Siti Aminah",
+  "age": 28,
+  "gender": "Female",
+  "chief_complaint": "Severe abdominal pain for 6 hours",
+  "presenting_history": "The patient developed sudden severe pain in the right lower quadrant of her abdomen while at work. The pain started around her belly button area and moved to the right side. She had one episode of vomiting and has lost her appetite. She feels feverish.",
+  "vitals": {
+    "blood_pressure": "110/70 mmHg",
+    "heart_rate": "105 bpm",
+    "respiratory_rate": "18 breaths/min",
+    "temperature": "38.2 C",
+    "spo2": "99% on room air"
+  },
+  "past_medical_history": [
+    "Nil significant"
+  ],
+  "social_history": "Non-smoker. No alcohol. Works as an administrative assistant. Single, not sexually active.",
+  "allergies": "Allergic to Sulfa drugs - causes rash",
+  "menstrual_history": "Last menstrual period was 2 weeks ago. Regular cycles, 28-day cycle.",
+  "script_instructions": "You are playing Ms. Siti Aminah, a 28-year-old Malay Singaporean woman. You are in obvious pain and lying still because movement makes it worse. You feel nauseous when you move. When the doctor presses on your abdomen, you should indicate that the right lower area is very tender. You are a bit shy when asked about menstrual or sexual history.",
+  "secret_info": "The patient initially had diarrhoea yesterday which she attributed to eating outside food. She took some paracetamol but it did not help the pain.",
+  "singlish_level": "low",
+  "expected_diagnosis": "Acute Appendicitis"
+}
