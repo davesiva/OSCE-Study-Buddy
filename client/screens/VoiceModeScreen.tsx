@@ -535,8 +535,8 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
                 ? "Listening to you..."
                 : isSpeaking
                 ? "Patient is speaking..."
-                : "Tap to end call"
-              : "Tap to start voice call"}
+                : "Tap to End"
+              : "Tap to Start"}
           </ThemedText>
 
           {isConnected ? (
@@ -545,7 +545,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
               style={[styles.endCallButton, { backgroundColor: "#EF4444" }]}
             >
               <Feather name="phone-off" size={24} color="#FFFFFF" />
-              <ThemedText style={styles.endCallText}>End Call</ThemedText>
+              <ThemedText style={styles.endCallText}>End</ThemedText>
             </Pressable>
           ) : null}
         </View>
