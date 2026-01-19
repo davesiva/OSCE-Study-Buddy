@@ -20,12 +20,15 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 
 interface CaseData {
   case_id: string;
@@ -280,6 +283,7 @@ export default function OSCESimulatorScreen() {
   const headerHeight = useHeaderHeight();
   const { theme } = useTheme();
   const flatListRef = useRef<FlatList>(null);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [cases, setCases] = useState<CaseData[]>([]);
   const [selectedCase, setSelectedCase] = useState<CaseData | null>(null);
@@ -450,18 +454,36 @@ export default function OSCESimulatorScreen() {
 
           {selectedCase ? <PatientDetails caseData={selectedCase} /> : null}
 
-          {messages.length > 0 ? (
-            <Pressable
-              onPress={handleClearChat}
-              style={[
-                styles.clearButton,
-                { backgroundColor: theme.backgroundDefault },
-              ]}
-            >
-              <Feather name="trash-2" size={16} color="#EF4444" />
-              <ThemedText style={styles.clearButtonText}>Clear Chat</ThemedText>
-            </Pressable>
-          ) : null}
+          <View style={styles.actionButtons}>
+            {selectedCase ? (
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  navigation.navigate("VoiceMode", { caseData: selectedCase });
+                }}
+                style={[
+                  styles.voiceModeButton,
+                  { backgroundColor: theme.link },
+                ]}
+              >
+                <Feather name="mic" size={16} color="#FFFFFF" />
+                <ThemedText style={styles.voiceModeButtonText}>Voice Mode</ThemedText>
+              </Pressable>
+            ) : null}
+
+            {messages.length > 0 ? (
+              <Pressable
+                onPress={handleClearChat}
+                style={[
+                  styles.clearButton,
+                  { backgroundColor: theme.backgroundDefault },
+                ]}
+              >
+                <Feather name="trash-2" size={16} color="#EF4444" />
+                <ThemedText style={styles.clearButtonText}>Clear Chat</ThemedText>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         <FlatList
@@ -669,6 +691,24 @@ const styles = StyleSheet.create({
   vitalValue: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  actionButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+  voiceModeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.full,
+  },
+  voiceModeButtonText: {
+    marginLeft: Spacing.xs,
+    fontSize: 13,
+    color: "#FFFFFF",
+    fontWeight: "500",
   },
   clearButton: {
     flexDirection: "row",
