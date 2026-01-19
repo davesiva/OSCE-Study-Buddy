@@ -237,6 +237,9 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const audioChunksRef = useRef<Float32Array[]>([]);
+  const audioQueueRef = useRef<ArrayBuffer[]>([]);
+  const isPlayingRef = useRef(false);
+  const nextPlayTimeRef = useRef(0);
 
   const micScale = useSharedValue(1);
   const pulseScale = useSharedValue(1);
@@ -436,6 +439,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     setIsConnected(false);
     setIsListening(false);
     setIsSpeaking(false);
+    nextPlayTimeRef.current = 0;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, []);
 
@@ -452,7 +456,11 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
       const source = audioContextRef.current.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContextRef.current.destination);
-      source.start();
+
+      const currentTime = audioContextRef.current.currentTime;
+      const startTime = Math.max(currentTime, nextPlayTimeRef.current);
+      source.start(startTime);
+      nextPlayTimeRef.current = startTime + audioBuffer.duration;
     } catch (e) {
       console.error("Error playing audio:", e);
     }
@@ -499,36 +507,36 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
         ) : null}
 
         <View style={[styles.controlsContainer, { paddingBottom: insets.bottom + Spacing.xl }]}>
-          <View style={styles.micButtonContainer}>
-            <Animated.View
-              style={[
-                styles.pulse,
-                { backgroundColor: isConnected ? "#22C55E" : theme.link },
-                pulseStyle,
-              ]}
-            />
-            <AnimatedPressable
-              onPress={handleMicPress}
-              disabled={isConnecting}
-              style={[
-                styles.micButton,
-                {
-                  backgroundColor: isConnecting
-                    ? theme.tabIconDefault
-                    : isConnected
-                    ? "#22C55E"
-                    : theme.link,
-                },
-                micButtonStyle,
-              ]}
-            >
-              <Feather
-                name={isConnected ? "mic" : "mic-off"}
-                size={40}
-                color="#FFFFFF"
+          {!isConnected ? (
+            <View style={styles.micButtonContainer}>
+              <Animated.View
+                style={[
+                  styles.pulse,
+                  { backgroundColor: theme.link },
+                  pulseStyle,
+                ]}
               />
-            </AnimatedPressable>
-          </View>
+              <AnimatedPressable
+                onPress={handleMicPress}
+                disabled={isConnecting}
+                style={[
+                  styles.micButton,
+                  {
+                    backgroundColor: isConnecting
+                      ? theme.tabIconDefault
+                      : theme.link,
+                  },
+                  micButtonStyle,
+                ]}
+              >
+                <Feather
+                  name="mic-off"
+                  size={40}
+                  color="#FFFFFF"
+                />
+              </AnimatedPressable>
+            </View>
+          ) : null}
 
           <ThemedText style={styles.statusText}>
             {isConnecting
@@ -538,7 +546,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
                 ? "Listening to you..."
                 : isSpeaking
                 ? "Patient is speaking..."
-                : "Tap to End"
+                : "Session active"
               : "Tap to Start"}
           </ThemedText>
 
@@ -547,7 +555,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
               onPress={disconnectVoiceSession}
               style={[styles.endCallButton, { backgroundColor: "#EF4444" }]}
             >
-              <Feather name="phone-off" size={24} color="#FFFFFF" />
+              <Feather name="x" size={24} color="#FFFFFF" />
               <ThemedText style={styles.endCallText}>End</ThemedText>
             </Pressable>
           ) : null}
