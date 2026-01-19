@@ -35,7 +35,7 @@ export default function RootStackNavigator() {
         name="Home"
         component={HomeScreen}
         options={{
-          headerTitle: () => <HeaderTitle title="OSCE Simulation" />,
+          headerTitle: () => <HeaderTitle title="OSCE Study Buddy" />,
         }}
       />
       <Stack.Screen

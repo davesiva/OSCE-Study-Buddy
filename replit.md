@@ -1,4 +1,4 @@
-# OSCE Simulation
+# OSCE Study Buddy
 
 ## Overview
 A mobile-first web application for medical students to practice OSCE (Objective Structured Clinical Examination) patient interactions through AI-powered chat and voice simulations.
