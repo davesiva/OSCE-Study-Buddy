@@ -1,12 +1,12 @@
 # Medical Student Assistant
 
 ## Overview
-A mobile-first web application for medical students to practice OSCE (Objective Structured Clinical Examination) patient interactions through AI-powered chat simulations.
+A mobile-first web application for medical students to practice OSCE (Objective Structured Clinical Examination) patient interactions through AI-powered chat and voice simulations.
 
 ## Tech Stack
 - **Frontend**: React Native (Expo) - works in mobile browsers
 - **Backend**: Express.js with TypeScript
-- **AI**: OpenAI GPT-4o-mini for patient simulation
+- **AI**: OpenAI GPT-4o-mini for chat, GPT-4o-realtime for voice conversations
 - **Data**: Local JSON files for cases, CSV for feedback
 
 ## Project Structure
@@ -24,6 +24,7 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 /server                # Express.js backend
   index.ts             # Server setup
   routes.ts            # API endpoints
+  realtime.ts          # WebSocket relay for voice mode
 
 /cases                 # Patient case JSON files
   case_chest_pain.json
@@ -58,8 +59,18 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 - Case selection dropdown
 - Collapsible patient details with vital signs
 - Real-time chat with AI patient
+- Voice Mode button for natural voice conversations
 - Chat history persisted via AsyncStorage
 - Singlish language support (configurable per case)
+
+### Voice Mode (Web only)
+- Real-time voice conversations with AI patient using OpenAI Realtime API
+- Animated audio visualizer showing speech activity
+- Patient avatar with speaking animation
+- Live transcription of both student and patient speech
+- Server VAD (Voice Activity Detection) for automatic turn-taking
+- WebSocket relay architecture: Client -> Backend -> OpenAI Realtime API
+- Audio format: PCM16 at 24kHz mono
 
 ### Feedback
 - Rating selector
@@ -75,6 +86,7 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 - `POST /api/chat` - Send message to AI patient
 - `POST /api/feedback` - Submit user feedback
 - `GET /api/health` - Health check
+- `WS /api/realtime` - WebSocket endpoint for voice mode (relays to OpenAI Realtime API)
 
 ## Case JSON Schema
 
