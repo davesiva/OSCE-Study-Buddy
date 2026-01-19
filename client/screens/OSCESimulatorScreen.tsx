@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  ScrollView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -98,28 +99,34 @@ function CaseSelector({
             { backgroundColor: theme.backgroundDefault },
           ]}
         >
-          {cases.map((caseData) => (
-            <Pressable
-              key={caseData.case_id}
-              onPress={() => {
-                onSelect(caseData);
-                setIsOpen(false);
-              }}
-              style={[
-                styles.caseOption,
-                selectedCase?.case_id === caseData.case_id && {
-                  backgroundColor: theme.backgroundSecondary,
-                },
-              ]}
-            >
-              <ThemedText style={styles.caseOptionName}>
-                {caseData.patient_name}
-              </ThemedText>
-              <ThemedText style={styles.caseOptionComplaint}>
-                {caseData.chief_complaint}
-              </ThemedText>
-            </Pressable>
-          ))}
+          <ScrollView
+            style={styles.caseDropdownScroll}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator
+          >
+            {cases.map((caseData) => (
+              <Pressable
+                key={caseData.case_id}
+                onPress={() => {
+                  onSelect(caseData);
+                  setIsOpen(false);
+                }}
+                style={[
+                  styles.caseOption,
+                  selectedCase?.case_id === caseData.case_id && {
+                    backgroundColor: theme.backgroundSecondary,
+                  },
+                ]}
+              >
+                <ThemedText style={styles.caseOptionName}>
+                  {caseData.patient_name}
+                </ThemedText>
+                <ThemedText style={styles.caseOptionComplaint}>
+                  {caseData.chief_complaint}
+                </ThemedText>
+              </Pressable>
+            ))}
+          </ScrollView>
         </View>
       ) : null}
     </View>
@@ -668,6 +675,9 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  caseDropdownScroll: {
+    maxHeight: 240,
+  },
   caseOption: {
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
@@ -686,6 +696,7 @@ const styles = StyleSheet.create({
   },
   detailsContainer: {
     marginBottom: Spacing.sm,
+    zIndex: 1,
   },
   detailsHeader: {
     flexDirection: "row",
@@ -750,6 +761,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: Spacing.sm,
+    zIndex: 1,
   },
   voiceModeButton: {
     flexDirection: "row",
