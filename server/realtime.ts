@@ -106,12 +106,17 @@ export function setupRealtimeWebSocket(server: Server): void {
           openaiWs.on("open", () => {
             console.log("Connected to OpenAI Realtime API");
 
+            const patientGender = caseData?.gender?.toLowerCase() || "";
+            const isMale = patientGender === "male" || patientGender === "m";
+            const selectedVoice = isMale ? "echo" : "coral";
+            console.log(`Patient gender: ${caseData?.gender}, using voice: ${selectedVoice}`);
+
             const sessionConfig = {
               type: "session.update",
               session: {
                 modalities: ["text", "audio"],
                 instructions: buildVoiceInstructions(caseData!),
-                voice: "coral",
+                voice: selectedVoice,
                 input_audio_format: "pcm16",
                 output_audio_format: "pcm16",
                 input_audio_transcription: {
