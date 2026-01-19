@@ -93,8 +93,7 @@ export default function HomeScreen() {
             Welcome
           </ThemedText>
           <ThemedText style={styles.welcomeText}>
-            Practice your clinical skills with AI-powered patient simulations.
-            Perfect for OSCE preparation and history-taking practice.
+            On-demand simulated patients for clerking and OSCE preparation.
           </ThemedText>
         </View>
 
