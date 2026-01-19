@@ -51,6 +51,7 @@ interface ChatMessage {
 }
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const LOCAL_CASES_KEY = "custom_cases_local";
 
 function CaseSelector({
   cases,
@@ -306,12 +307,25 @@ export default function OSCESimulatorScreen() {
   const loadCases = async () => {
     try {
       setIsLoading(true);
+      
       const baseUrl = getApiUrl();
       const response = await fetch(new URL("/api/cases", baseUrl).toString());
-      const data = await response.json();
-      setCases(data);
-      if (data.length > 0) {
-        setSelectedCase(data[0]);
+      const serverCases = await response.json();
+      
+      let localCases: CaseData[] = [];
+      try {
+        const localCasesJson = await AsyncStorage.getItem(LOCAL_CASES_KEY);
+        if (localCasesJson) {
+          localCases = JSON.parse(localCasesJson);
+        }
+      } catch (e) {
+        console.error("Error loading local cases:", e);
+      }
+      
+      const allCases = [...serverCases, ...localCases];
+      setCases(allCases);
+      if (allCases.length > 0) {
+        setSelectedCase(allCases[0]);
       }
     } catch (error) {
       console.error("Error loading cases:", error);
