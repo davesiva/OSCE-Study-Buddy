@@ -112,6 +112,14 @@ export default function HomeScreen() {
           />
 
           <NavButton
+            title="Create Custom Case"
+            subtitle="Add your own patient scenarios"
+            icon="plus-circle"
+            color="#8B5CF6"
+            onPress={() => navigation.navigate("CreateCase")}
+          />
+
+          <NavButton
             title="Submit Feedback"
             subtitle="Help us improve"
             icon="message-circle"

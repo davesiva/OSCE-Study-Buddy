@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import HomeScreen from "@/screens/HomeScreen";
 import OSCESimulatorScreen from "@/screens/OSCESimulatorScreen";
 import FeedbackScreen from "@/screens/FeedbackScreen";
+import CreateCaseScreen from "@/screens/CreateCaseScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
 
@@ -11,6 +12,7 @@ export type RootStackParamList = {
   Home: undefined;
   OSCESimulator: undefined;
   Feedback: undefined;
+  CreateCase: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -39,6 +41,13 @@ export default function RootStackNavigator() {
         component={FeedbackScreen}
         options={{
           headerTitle: "Feedback",
+        }}
+      />
+      <Stack.Screen
+        name="CreateCase"
+        component={CreateCaseScreen}
+        options={{
+          headerTitle: "Create Case",
         }}
       />
     </Stack.Navigator>

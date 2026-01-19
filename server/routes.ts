@@ -198,6 +198,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Save a custom case (upload)
+  app.post("/api/cases", (req: Request, res: Response) => {
+    try {
+      const caseData = req.body as CaseData & { is_custom?: boolean };
+      
+      if (!caseData.patient_name || !caseData.chief_complaint) {
+        res.status(400).json({ error: "Patient name and chief complaint are required" });
+        return;
+      }
+
+      const casesDir = path.resolve(process.cwd(), "cases");
+      if (!fs.existsSync(casesDir)) {
+        fs.mkdirSync(casesDir, { recursive: true });
+      }
+
+      const fileName = `case_custom_${caseData.case_id || Date.now()}.json`;
+      const filePath = path.join(casesDir, fileName);
+      
+      fs.writeFileSync(filePath, JSON.stringify(caseData, null, 2));
+      
+      res.json({ success: true, case_id: caseData.case_id, fileName });
+    } catch (error) {
+      console.error("Error saving case:", error);
+      res.status(500).json({ error: "Failed to save case" });
+    }
+  });
+
   // Health check
   app.get("/api/health", (_req: Request, res: Response) => {
     res.json({ status: "ok" });
