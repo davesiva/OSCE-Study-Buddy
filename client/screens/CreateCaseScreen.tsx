@@ -5,7 +5,6 @@ import {
   ScrollView,
   TextInput,
   Pressable,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -107,15 +106,15 @@ function FormInput({
           styles.input,
           multiline && styles.inputMultiline,
           {
-            backgroundColor: theme.backgroundElevated,
-            color: theme.textPrimary,
-            borderColor: theme.borderDefault,
+            backgroundColor: theme.backgroundSecondary,
+            color: theme.text,
+            borderColor: theme.tabIconDefault,
           },
         ]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={theme.textTertiary}
+        placeholderTextColor={theme.tabIconDefault}
         multiline={multiline}
         textAlignVertical={multiline ? "top" : "center"}
         keyboardType={keyboardType}
@@ -150,15 +149,15 @@ function OptionButton({ label, selected, onPress }: OptionButtonProps) {
         styles.optionButton,
         animatedStyle,
         {
-          backgroundColor: selected ? "#0066CC" : theme.backgroundElevated,
-          borderColor: selected ? "#0066CC" : theme.borderDefault,
+          backgroundColor: selected ? "#0066CC" : theme.backgroundSecondary,
+          borderColor: selected ? "#0066CC" : theme.tabIconDefault,
         },
       ]}
     >
       <ThemedText
         style={[
           styles.optionButtonText,
-          { color: selected ? "#FFFFFF" : theme.textPrimary },
+          { color: selected ? "#FFFFFF" : theme.text },
         ]}
       >
         {label}
@@ -177,6 +176,7 @@ export default function CreateCaseScreen() {
   const [formData, setFormData] = useState<CaseFormData>(initialFormData);
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [saveSuccess, setSaveSuccess] = useState<{ type: "local" | "upload"; name: string } | null>(null);
 
   const updateField = (field: keyof CaseFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -258,14 +258,13 @@ export default function CreateCaseScreen() {
       await AsyncStorage.setItem(LOCAL_CASES_KEY, JSON.stringify(existingCases));
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
-        "Case Saved",
-        `"${newCase.patient_name}" has been saved to your device. You can now use this case in the OSCE Simulator.`,
-        [{ text: "OK", onPress: () => navigation.goBack() }]
-      );
+      setSaveSuccess({ type: "local", name: newCase.patient_name });
+      setTimeout(() => {
+        navigation.goBack();
+      }, 2000);
     } catch (error) {
       console.error("Error saving locally:", error);
-      Alert.alert("Error", "Failed to save case locally. Please try again.");
+      setErrors(["Failed to save case locally. Please try again."]);
     } finally {
       setIsSaving(false);
     }
@@ -286,14 +285,13 @@ export default function CreateCaseScreen() {
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
-        "Case Uploaded",
-        `"${newCase.patient_name}" has been uploaded to the server. Everyone can now use this case.`,
-        [{ text: "OK", onPress: () => navigation.goBack() }]
-      );
+      setSaveSuccess({ type: "upload", name: newCase.patient_name });
+      setTimeout(() => {
+        navigation.goBack();
+      }, 2000);
     } catch (error) {
       console.error("Error uploading:", error);
-      Alert.alert("Error", "Failed to upload case. Please try again or save locally.");
+      setErrors(["Failed to upload case. Please try again or save locally."]);
     } finally {
       setIsSaving(false);
     }
@@ -317,14 +315,14 @@ export default function CreateCaseScreen() {
                     ? "#0066CC"
                     : step.id < currentStep
                     ? "#10B981"
-                    : theme.backgroundElevated,
+                    : theme.backgroundSecondary,
               },
             ]}
           >
             <Feather
               name={step.id < currentStep ? "check" : (step.icon as any)}
               size={14}
-              color={step.id <= currentStep ? "#FFFFFF" : theme.textTertiary}
+              color={step.id <= currentStep ? "#FFFFFF" : theme.tabIconDefault}
             />
           </Pressable>
           {index < STEPS.length - 1 && (
@@ -333,7 +331,7 @@ export default function CreateCaseScreen() {
                 styles.stepLine,
                 {
                   backgroundColor:
-                    step.id < currentStep ? "#10B981" : theme.borderDefault,
+                    step.id < currentStep ? "#10B981" : theme.tabIconDefault,
                 },
               ]}
             />
@@ -522,14 +520,34 @@ export default function CreateCaseScreen() {
 
   const renderPreview = () => {
     const caseObj = buildCaseObject();
+
+    if (saveSuccess) {
+      return (
+        <Animated.View entering={FadeIn} style={styles.successContainer}>
+          <View style={styles.successIcon}>
+            <Feather name="check-circle" size={64} color="#10B981" />
+          </View>
+          <ThemedText type="h3" style={styles.successTitle}>
+            Case Saved!
+          </ThemedText>
+          <ThemedText style={styles.successText}>
+            "{saveSuccess.name}" has been {saveSuccess.type === "local" ? "saved to your device" : "uploaded to the server"}.
+          </ThemedText>
+          <ThemedText style={styles.successSubtext}>
+            Redirecting to home...
+          </ThemedText>
+        </Animated.View>
+      );
+    }
+
     return (
       <Animated.View entering={FadeIn} exiting={FadeOut}>
         <ThemedText type="h4" style={styles.stepTitle}>
           Review Your Case
         </ThemedText>
 
-        <View style={[styles.previewCard, { backgroundColor: theme.backgroundElevated }]}>
-          <ThemedText type="h5" style={styles.previewName}>
+        <View style={[styles.previewCard, { backgroundColor: theme.backgroundDefault }]}>
+          <ThemedText type="h4" style={styles.previewName}>
             {caseObj.patient_name}
           </ThemedText>
           <ThemedText style={styles.previewMeta}>
@@ -556,7 +574,7 @@ export default function CreateCaseScreen() {
           </View>
         </View>
 
-        <ThemedText type="h5" style={styles.saveTitle}>
+        <ThemedText type="h4" style={styles.saveTitle}>
           Where would you like to save this case?
         </ThemedText>
 
@@ -660,13 +678,13 @@ export default function CreateCaseScreen() {
             {
               paddingBottom: insets.bottom + Spacing.md,
               backgroundColor: theme.backgroundDefault,
-              borderTopColor: theme.borderDefault,
+              borderTopColor: theme.tabIconDefault,
             },
           ]}
         >
           {currentStep > 1 ? (
             <Pressable onPress={handleBack} style={styles.backButton}>
-              <Feather name="arrow-left" size={20} color={theme.textPrimary} />
+              <Feather name="arrow-left" size={20} color={theme.text} />
               <ThemedText style={styles.backButtonText}>Back</ThemedText>
             </Pressable>
           ) : (
@@ -855,5 +873,27 @@ const styles = StyleSheet.create({
   saveButtonSubtitle: {
     color: "rgba(255,255,255,0.8)",
     fontSize: 13,
+  },
+  successContainer: {
+    alignItems: "center",
+    paddingVertical: Spacing["3xl"],
+  },
+  successIcon: {
+    marginBottom: Spacing.xl,
+  },
+  successTitle: {
+    textAlign: "center",
+    marginBottom: Spacing.md,
+  },
+  successText: {
+    textAlign: "center",
+    opacity: 0.8,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+  },
+  successSubtext: {
+    textAlign: "center",
+    opacity: 0.5,
+    fontSize: 14,
   },
 });

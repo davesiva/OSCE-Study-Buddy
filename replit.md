@@ -36,6 +36,16 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 - Large, mobile-friendly navigation buttons
 - Overview of app features
 
+### Create Custom Case
+- Multi-step form to create patient cases
+- Step 1: Patient info (name, age, gender, complaint)
+- Step 2: Vital signs
+- Step 3: Medical history
+- Step 4: AI acting instructions and Singlish level
+- Step 5: Preview and save options
+- Save locally (AsyncStorage) or upload to server
+- Validation on each step
+
 ### OSCE Simulator
 - Case selection dropdown
 - Collapsible patient details with vital signs
@@ -52,6 +62,7 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 
 - `GET /api/cases` - List all available cases
 - `GET /api/cases/:caseId` - Get specific case details
+- `POST /api/cases` - Save a custom case (upload)
 - `POST /api/chat` - Send message to AI patient
 - `POST /api/feedback` - Submit user feedback
 - `GET /api/health` - Health check
