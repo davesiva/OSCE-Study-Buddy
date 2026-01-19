@@ -225,6 +225,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Parse PDF content to extract case data
+  app.post("/api/parse-case", async (req: Request, res: Response) => {
+    try {
+      const { content } = req.body as { content: string };
+      
+      if (!content) {
+        res.status(400).json({ error: "PDF content is required" });
+        return;
+      }
+
+      const prompt = `You are an expert at parsing OSCE (Objective Structured Clinical Examination) documents. 
+Extract the patient case information from the following document content and return it as JSON.
+
+The document may be either:
+- EI (Examiner Instructions) - contains detailed patient info, history, and expected findings
+- CI (Candidate Instructions) - contains scenario info and patient vitals
+
+Extract and return ONLY a valid JSON object with these fields:
+{
+  "patient_name": "Full name of the patient",
+  "age": "Age as a number",
+  "gender": "Male or Female",
+  "chief_complaint": "Main presenting complaint",
+  "presenting_history": "Detailed history of presenting illness",
+  "blood_pressure": "Blood pressure reading (e.g., 120/80 mmHg)",
+  "heart_rate": "Heart rate (e.g., 72/min or 72 bpm)",
+  "respiratory_rate": "Respiratory rate if available",
+  "temperature": "Temperature if available",
+  "spo2": "Oxygen saturation if available",
+  "past_medical_history": "List of past medical conditions, each on a new line",
+  "social_history": "Social history details",
+  "allergies": "Known allergies or 'No known allergies'",
+  "script_instructions": "How the patient should act/behave, their emotions, personality traits. Include any specific behaviors or responses the patient should exhibit.",
+  "secret_info": "Information the patient only reveals when asked specific questions (from the examiner instructions)",
+  "expected_diagnosis": "The expected or actual diagnosis if mentioned"
+}
+
+Important:
+- Extract as much information as possible from the document
+- For script_instructions, synthesize how the patient should behave based on the context
+- For secret_info, include any information that should only be revealed with direct questioning
+- Return ONLY the JSON object, no additional text
+
+Document content:
+${content}`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 2000,
+        temperature: 0.3,
+      });
+
+      const responseText = response.choices[0]?.message?.content || "";
+      
+      // Try to parse the JSON from the response
+      let extractedData;
+      try {
+        // Remove markdown code blocks if present
+        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        const jsonText = jsonMatch ? jsonMatch[1] : responseText;
+        extractedData = JSON.parse(jsonText.trim());
+      } catch {
+        // If parsing fails, try to find JSON object in the text
+        const jsonStart = responseText.indexOf("{");
+        const jsonEnd = responseText.lastIndexOf("}");
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          extractedData = JSON.parse(responseText.slice(jsonStart, jsonEnd + 1));
+        } else {
+          throw new Error("Could not parse JSON from AI response");
+        }
+      }
+
+      res.json({ success: true, data: extractedData });
+    } catch (error) {
+      console.error("Error parsing case:", error);
+      res.status(500).json({ error: "Failed to parse the document. Please try again." });
+    }
+  });
+
   // Health check
   app.get("/api/health", (_req: Request, res: Response) => {
     res.json({ status: "ok" });

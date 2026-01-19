@@ -6,12 +6,15 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useNavigation } from "@react-navigation/native";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Animated, {
   useAnimatedStyle,
@@ -70,6 +73,7 @@ const initialFormData: CaseFormData = {
 };
 
 const STEPS = [
+  { id: 0, title: "Choose Method", icon: "plus" },
   { id: 1, title: "Patient Info", icon: "user" },
   { id: 2, title: "Vitals", icon: "heart" },
   { id: 3, title: "History", icon: "file-text" },
@@ -172,14 +176,96 @@ export default function CreateCaseScreen() {
   const { theme } = useTheme();
   const navigation = useNavigation();
 
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<CaseFormData>(initialFormData);
   const [isSaving, setIsSaving] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [saveSuccess, setSaveSuccess] = useState<{ type: "local" | "upload"; name: string } | null>(null);
 
   const updateField = (field: keyof CaseFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleStartFromScratch = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFormData(initialFormData);
+    setCurrentStep(1);
+  };
+
+  const handleImportPDF = async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "text/plain"],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const file = result.assets[0];
+      if (!file) return;
+
+      setIsParsing(true);
+      setErrors([]);
+
+      let content = "";
+      
+      if (Platform.OS === "web") {
+        const response = await fetch(file.uri);
+        content = await response.text();
+      } else {
+        content = await FileSystem.readAsStringAsync(file.uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+      }
+
+      const parseResponse = await fetch(new URL("/api/parse-case", getApiUrl()).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!parseResponse.ok) {
+        throw new Error("Failed to parse document");
+      }
+
+      const { data } = await parseResponse.json();
+
+      setFormData({
+        patient_name: data.patient_name || "",
+        age: String(data.age || ""),
+        gender: data.gender || "Male",
+        chief_complaint: data.chief_complaint || "",
+        presenting_history: data.presenting_history || "",
+        blood_pressure: data.blood_pressure || "",
+        heart_rate: data.heart_rate || "",
+        respiratory_rate: data.respiratory_rate || "",
+        temperature: data.temperature || "",
+        spo2: data.spo2 || "",
+        past_medical_history: Array.isArray(data.past_medical_history) 
+          ? data.past_medical_history.join("\n") 
+          : data.past_medical_history || "",
+        social_history: data.social_history || "",
+        allergies: data.allergies || "",
+        script_instructions: data.script_instructions || "",
+        secret_info: data.secret_info || "",
+        singlish_level: "moderate",
+        expected_diagnosis: data.expected_diagnosis || "",
+      });
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setCurrentStep(1);
+    } catch (error) {
+      console.error("Error importing PDF:", error);
+      setErrors(["Failed to parse the document. Please make sure it's a valid OSCE case file."]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setIsParsing(false);
+    }
   };
 
   const validateStep = (step: number): string[] => {
@@ -216,7 +302,12 @@ export default function CreateCaseScreen() {
   const handleBack = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setErrors([]);
-    setCurrentStep((prev) => Math.max(prev - 1, 1));
+    if (currentStep === 1) {
+      setCurrentStep(0);
+      setFormData(initialFormData);
+    } else {
+      setCurrentStep((prev) => Math.max(prev - 1, 0));
+    }
   };
 
   const buildCaseObject = () => {
@@ -297,48 +388,119 @@ export default function CreateCaseScreen() {
     }
   };
 
-  const renderStepIndicator = () => (
-    <View style={styles.stepIndicator}>
-      {STEPS.map((step, index) => (
-        <React.Fragment key={step.id}>
-          <Pressable
-            onPress={() => {
-              if (step.id < currentStep) {
-                setCurrentStep(step.id);
-              }
-            }}
-            style={[
-              styles.stepDot,
-              {
-                backgroundColor:
-                  step.id === currentStep
-                    ? "#0066CC"
-                    : step.id < currentStep
-                    ? "#10B981"
-                    : theme.backgroundSecondary,
-              },
-            ]}
-          >
-            <Feather
-              name={step.id < currentStep ? "check" : (step.icon as any)}
-              size={14}
-              color={step.id <= currentStep ? "#FFFFFF" : theme.tabIconDefault}
-            />
-          </Pressable>
-          {index < STEPS.length - 1 && (
-            <View
+  const renderStepIndicator = () => {
+    const formSteps = STEPS.filter(s => s.id > 0);
+    return (
+      <View style={styles.stepIndicator}>
+        {formSteps.map((step, index) => (
+          <React.Fragment key={step.id}>
+            <Pressable
+              onPress={() => {
+                if (step.id < currentStep && step.id > 0) {
+                  setCurrentStep(step.id);
+                }
+              }}
               style={[
-                styles.stepLine,
+                styles.stepDot,
                 {
                   backgroundColor:
-                    step.id < currentStep ? "#10B981" : theme.tabIconDefault,
+                    step.id === currentStep
+                      ? "#0066CC"
+                      : step.id < currentStep
+                      ? "#10B981"
+                      : theme.backgroundSecondary,
                 },
               ]}
-            />
-          )}
-        </React.Fragment>
-      ))}
-    </View>
+            >
+              <Feather
+                name={step.id < currentStep ? "check" : (step.icon as any)}
+                size={14}
+                color={step.id <= currentStep ? "#FFFFFF" : theme.tabIconDefault}
+              />
+            </Pressable>
+            {index < formSteps.length - 1 && (
+              <View
+                style={[
+                  styles.stepLine,
+                  {
+                    backgroundColor:
+                      step.id < currentStep ? "#10B981" : theme.tabIconDefault,
+                  },
+                ]}
+              />
+            )}
+          </React.Fragment>
+        ))}
+      </View>
+    );
+  };
+
+  const renderStep0 = () => (
+    <Animated.View entering={FadeIn} exiting={FadeOut}>
+      <ThemedText type="h4" style={styles.stepTitle}>
+        How would you like to create your case?
+      </ThemedText>
+      
+      <ThemedText style={styles.methodDescription}>
+        Choose to start from scratch or import from an existing OSCE document.
+      </ThemedText>
+
+      <Pressable
+        onPress={handleStartFromScratch}
+        style={[styles.methodButton, { backgroundColor: theme.backgroundDefault }]}
+      >
+        <View style={[styles.methodIcon, { backgroundColor: "#0066CC20" }]}>
+          <Feather name="edit-3" size={28} color="#0066CC" />
+        </View>
+        <View style={styles.methodContent}>
+          <ThemedText style={styles.methodTitle}>Start from Scratch</ThemedText>
+          <ThemedText style={styles.methodSubtitle}>
+            Manually enter all patient details
+          </ThemedText>
+        </View>
+        <Feather name="chevron-right" size={24} color={theme.tabIconDefault} />
+      </Pressable>
+
+      <Pressable
+        onPress={handleImportPDF}
+        disabled={isParsing}
+        style={[styles.methodButton, { backgroundColor: theme.backgroundDefault }]}
+      >
+        {isParsing ? (
+          <>
+            <View style={[styles.methodIcon, { backgroundColor: "#8B5CF620" }]}>
+              <ActivityIndicator size="small" color="#8B5CF6" />
+            </View>
+            <View style={styles.methodContent}>
+              <ThemedText style={styles.methodTitle}>Analyzing Document...</ThemedText>
+              <ThemedText style={styles.methodSubtitle}>
+                Extracting case information with AI
+              </ThemedText>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={[styles.methodIcon, { backgroundColor: "#8B5CF620" }]}>
+              <Feather name="upload" size={28} color="#8B5CF6" />
+            </View>
+            <View style={styles.methodContent}>
+              <ThemedText style={styles.methodTitle}>Import from Document</ThemedText>
+              <ThemedText style={styles.methodSubtitle}>
+                Upload EI/CI PDF or text file
+              </ThemedText>
+            </View>
+            <Feather name="chevron-right" size={24} color={theme.tabIconDefault} />
+          </>
+        )}
+      </Pressable>
+
+      <View style={[styles.infoBox, { backgroundColor: theme.backgroundDefault }]}>
+        <Feather name="info" size={16} color={theme.tabIconDefault} />
+        <ThemedText style={styles.infoText}>
+          When importing, the AI will extract patient info, vitals, history, and acting instructions from your OSCE documents.
+        </ThemedText>
+      </View>
+    </Animated.View>
   );
 
   const renderStep1 = () => (
@@ -623,6 +785,8 @@ export default function CreateCaseScreen() {
 
   const renderCurrentStep = () => {
     switch (currentStep) {
+      case 0:
+        return renderStep0();
       case 1:
         return renderStep1();
       case 2:
@@ -652,11 +816,13 @@ export default function CreateCaseScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {renderStepIndicator()}
+        {currentStep > 0 && renderStepIndicator()}
 
-        <ThemedText style={styles.stepLabel}>
-          Step {currentStep} of 5: {STEPS[currentStep - 1].title}
-        </ThemedText>
+        {currentStep > 0 ? (
+          <ThemedText style={styles.stepLabel}>
+            Step {currentStep} of 5: {STEPS[currentStep].title}
+          </ThemedText>
+        ) : null}
 
         {errors.length > 0 && (
           <View style={[styles.errorBox, { backgroundColor: "#FEE2E2" }]}>
@@ -671,7 +837,7 @@ export default function CreateCaseScreen() {
         {renderCurrentStep()}
       </ScrollView>
 
-      {currentStep < 5 && (
+      {currentStep > 0 && currentStep < 5 && (
         <View
           style={[
             styles.bottomNav,
@@ -682,14 +848,10 @@ export default function CreateCaseScreen() {
             },
           ]}
         >
-          {currentStep > 1 ? (
-            <Pressable onPress={handleBack} style={styles.backButton}>
-              <Feather name="arrow-left" size={20} color={theme.text} />
-              <ThemedText style={styles.backButtonText}>Back</ThemedText>
-            </Pressable>
-          ) : (
-            <View style={styles.backButton} />
-          )}
+          <Pressable onPress={handleBack} style={styles.backButton}>
+            <Feather name="arrow-left" size={20} color={theme.text} />
+            <ThemedText style={styles.backButtonText}>Back</ThemedText>
+          </Pressable>
 
           <Pressable
             onPress={handleNext}
@@ -895,5 +1057,50 @@ const styles = StyleSheet.create({
     textAlign: "center",
     opacity: 0.5,
     fontSize: 14,
+  },
+  methodDescription: {
+    opacity: 0.7,
+    marginBottom: Spacing.xl,
+    fontSize: 15,
+  },
+  methodButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.md,
+  },
+  methodIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Spacing.md,
+  },
+  methodContent: {
+    flex: 1,
+  },
+  methodTitle: {
+    fontWeight: "600",
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  methodSubtitle: {
+    opacity: 0.6,
+    fontSize: 14,
+  },
+  infoBox: {
+    flexDirection: "row",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginTop: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    opacity: 0.7,
+    lineHeight: 18,
   },
 });

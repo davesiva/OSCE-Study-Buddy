@@ -38,6 +38,7 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 
 ### Create Custom Case
 - Multi-step form to create patient cases
+- Step 0: Choose creation method (Start from Scratch or Import from Document)
 - Step 1: Patient info (name, age, gender, complaint)
 - Step 2: Vital signs
 - Step 3: Medical history
@@ -45,6 +46,13 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 - Step 5: Preview and save options
 - Save locally (AsyncStorage) or upload to server
 - Validation on each step
+
+### PDF Import Feature
+- Import OSCE cases from EI (Examiner Instructions) or CI (Candidate Instructions) PDFs
+- AI-powered extraction using OpenAI to parse document content
+- Auto-fills form fields with extracted patient info, vitals, history, and acting instructions
+- Users can review and edit AI-extracted data before saving
+- Supports PDF and text file formats
 
 ### OSCE Simulator
 - Case selection dropdown
@@ -63,6 +71,7 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 - `GET /api/cases` - List all available cases
 - `GET /api/cases/:caseId` - Get specific case details
 - `POST /api/cases` - Save a custom case (upload)
+- `POST /api/parse-case` - Parse OSCE document content using AI
 - `POST /api/chat` - Send message to AI patient
 - `POST /api/feedback` - Submit user feedback
 - `GET /api/health` - Health check
