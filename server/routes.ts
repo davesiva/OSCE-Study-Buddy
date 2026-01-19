@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import OpenAI from "openai";
 import * as fs from "fs";
 import * as path from "path";
+import { setupRealtimeWebSocket } from "./realtime";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -311,5 +312,8 @@ ${content}`;
   });
 
   const httpServer = createServer(app);
+  
+  setupRealtimeWebSocket(httpServer);
+
   return httpServer;
 }
