@@ -611,60 +611,7 @@ export default function CreateCaseScreen() {
           ))}
         </View>
 
-        <ThemedText style={styles.selectorLabel}>Select Difficulty</ThemedText>
-        <View style={styles.difficultyRow}>
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setSelectedDifficulty("easy");
-            }}
-            style={[
-              styles.difficultyOption,
-              {
-                backgroundColor: selectedDifficulty === "easy" ? "#22C55E" : theme.backgroundSecondary,
-                borderColor: selectedDifficulty === "easy" ? "#22C55E" : theme.tabIconDefault,
-              },
-            ]}
-          >
-            <ThemedText style={[styles.difficultyText, { color: selectedDifficulty === "easy" ? "#FFFFFF" : theme.text }]}>
-              Easy
-            </ThemedText>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setSelectedDifficulty("medium");
-            }}
-            style={[
-              styles.difficultyOption,
-              {
-                backgroundColor: selectedDifficulty === "medium" ? "#F59E0B" : theme.backgroundSecondary,
-                borderColor: selectedDifficulty === "medium" ? "#F59E0B" : theme.tabIconDefault,
-              },
-            ]}
-          >
-            <ThemedText style={[styles.difficultyText, { color: selectedDifficulty === "medium" ? "#FFFFFF" : theme.text }]}>
-              Medium
-            </ThemedText>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setSelectedDifficulty("challenging");
-            }}
-            style={[
-              styles.difficultyOption,
-              {
-                backgroundColor: selectedDifficulty === "challenging" ? "#EF4444" : theme.backgroundSecondary,
-                borderColor: selectedDifficulty === "challenging" ? "#EF4444" : theme.tabIconDefault,
-              },
-            ]}
-          >
-            <ThemedText style={[styles.difficultyText, { color: selectedDifficulty === "challenging" ? "#FFFFFF" : theme.text }]}>
-              Hard
-            </ThemedText>
-          </Pressable>
-        </View>
+        {/* Difficulty selection hidden for future enhancement */}
 
         <Pressable
           onPress={handleGenerateCase}
