@@ -28,7 +28,7 @@ export default function RootStackNavigator() {
         name="Home"
         component={HomeScreen}
         options={{
-          headerTitle: () => <HeaderTitle title="Medical Student Assistant" />,
+          headerTitle: () => <HeaderTitle title="OSCE Simulation" />,
         }}
       />
       <Stack.Screen
