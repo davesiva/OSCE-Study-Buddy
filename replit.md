@@ -39,7 +39,10 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 
 ### Create Custom Case
 - Multi-step form to create patient cases
-- Step 0: Choose creation method (Start from Scratch or Import from Document)
+- Step 0: Choose creation method:
+  - Start from Scratch: Manually enter all patient details
+  - Import from Document: Upload EI/CI PDF or text file
+  - Generate with AI: Select specialty and difficulty to auto-generate Singapore-focused case
 - Step 1: Patient info (name, age, gender, complaint)
 - Step 2: Vital signs
 - Step 3: Medical history
@@ -47,6 +50,14 @@ A mobile-first web application for medical students to practice OSCE (Objective 
 - Step 5: Preview and save options
 - Save locally (AsyncStorage) or upload to server
 - Validation on each step
+
+### AI Case Generator
+- Specialties: Cardiology, Respiratory, GI, Neurology, Renal, Endocrine, MSK, O&G, Infectious Disease
+- Difficulty levels:
+  - Easy: Textbook presentations (classic symptoms, obvious diagnosis)
+  - Medium: Atypical presentations (requires good clinical reasoning)
+  - Challenging: Rare conditions or unusual presentations (diagnostic dilemmas)
+- Singapore context: Local patient names, chronic disease patterns (DM, HTN, HLD), local conditions (dengue, TB), healthcare settings
 
 ### PDF Import Feature
 - Import OSCE cases from EI (Examiner Instructions) or CI (Candidate Instructions) PDFs
