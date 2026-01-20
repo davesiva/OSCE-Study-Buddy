@@ -418,12 +418,12 @@ export default function OSCESimulatorScreen() {
       const updatedMessages = [...newMessages, assistantMessage];
       setMessages(updatedMessages);
       saveChatHistory(selectedCase.case_id, updatedMessages);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending message:", error);
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm sorry, I'm having trouble responding right now. Please check your internet connection.",
+        content: `Error: ${error.message || "Unknown error"}. Please check your API key and connection.`,
       };
       const updatedMessages = [...newMessages, errorMessage];
       setMessages(updatedMessages);
