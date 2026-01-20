@@ -141,21 +141,12 @@ export default function FeedbackScreen() {
     setError("");
     setIsSubmitting(true);
 
-    try {
-      await apiRequest("POST", "/api/feedback", {
-        feedback: feedback.trim(),
-        rating,
-      });
-
+    // Mock submission for static site
+    setTimeout(() => {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setIsSubmitted(true);
-    } catch (err) {
-      console.error("Error submitting feedback:", err);
-      setError("Failed to submit feedback. Please try again.");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
       setIsSubmitting(false);
-    }
+    }, 1000);
   };
 
   const handleReset = () => {

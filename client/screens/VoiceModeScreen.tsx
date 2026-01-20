@@ -430,9 +430,10 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
       // 2. Speak Response
       speakResponse(responseText);
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setError("Failed to get response");
+      // Show exact error from OpenAI
+      setError(e.message || "Failed to get response");
     }
   };
 
@@ -496,7 +497,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
       const startTime = Math.max(currentTime, nextPlayTimeRef.current);
       source.start(startTime);
       nextPlayTimeRef.current = startTime + audioBuffer.duration;
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error playing audio:", e);
     }
   }, []);
