@@ -88,5 +88,30 @@ export const CASES = [
         "script_instructions": "You are playing Mr. Tan Ah Kow, a 55-year-old Chinese Singaporean man who works as a taxi driver. You are anxious and scared about your chest pain. You should describe your pain as 'very tight, like someone sitting on my chest'. You are cooperative but visibly distressed. When asked about your lifestyle, you are a bit defensive about your smoking habit.",
         "secret_info": "The patient has been having similar but milder episodes over the past week but ignored them. He also skipped his medications for the past 3 days because he ran out.",
         "expected_diagnosis": "Acute Coronary Syndrome / STEMI"
+    },
+    {
+        "case_id": "custom_1768900199396",
+        "patient_name": "Mdm. Lim Mei Ling",
+        "age": 34,
+        "gender": "Female",
+        "chief_complaint": "Feeling persistently tired and 'not myself' for the past 6 months",
+        "presenting_history": "Mdm. Lim has been feeling increasingly fatigued and lacks motivation to perform daily activities. She reports sleep disturbances and occasional feelings of worthlessness but initially downplays these issues, stating 'it's just part of life'. Upon further questioning, she reveals that she avoids social gatherings and feels overwhelmed by her responsibilities at work, which she has been finding particularly taxing.",
+        "vitals": {
+            "blood_pressure": "120/80 mmHg",
+            "heart_rate": "76 bpm",
+            "respiratory_rate": "16/min",
+            "temperature": "36.8°C",
+            "spo2": "98% on room air"
+        },
+        "past_medical_history": [
+            "Hypothyroidism on Euthyrox 75 mcg daily",
+            "No other significant medical history"
+        ],
+        "social_history": "Works as a teacher in a primary school, non-smoker, consumes alcohol occasionally at social events, lives in an HDB flat with her husband, diet mainly consists of hawker food but trying to eat healthier.",
+        "allergies": "No known drug allergies (NKDA)",
+        "script_instructions": "Mdm. Lim should exhibit slow, soft speech with long pauses between answers, often sighing or appearing lost in thought. She should maintain poor eye contact and have a flat affect throughout the interaction. Initially, she might respond to questions with vague answers or 'I don't know', requiring the examiner to encourage her to elaborate. If probed about her workload or social interactions, she may reveal feelings of being overwhelmed or fearful of disappointing others. Ensure her behavior reflects a sense of hopelessness and fatigue, as she struggles to articulate her feelings.",
+        "secret_info": "Mdm. Lim has been experiencing recurrent thoughts of self-harm but has not acted on them. She worries about being a burden to her family and fears that her colleagues will judge her if she takes a leave of absence.",
+        "expected_diagnosis": "Major Depressive Disorder (atypical presentation)",
+        "is_custom": true
     }
 ];

@@ -36,7 +36,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
-import { getApiUrl, apiRequest } from "@/lib/query-client";
+import { getChatCompletion, getAssessment } from "@/lib/openai-service";
 
 interface CaseData {
   case_id: string;
@@ -55,6 +55,74 @@ interface CaseData {
 }
 
 type VoiceModeScreenProps = NativeStackScreenProps<RootStackParamList, "VoiceMode">;
+
+// ... (previous code)
+
+const processUserMessage = async (text: string) => {
+  // Stop listening while thinking/speaking
+  setIsListening(false);
+
+  // 1. Get AI Response
+  try {
+    // Combine existing messages with the new user input
+    const conversationHistory = messages.map(m => ({
+      role: m.role as "user" | "assistant",
+      content: m.text
+    }));
+    conversationHistory.push({ role: "user", content: text });
+
+    const responseText = await getChatCompletion(
+      conversationHistory,
+      caseData!
+    );
+
+    setMessages(prev => [...prev, { id: Date.now() + "-ai", role: "assistant", text: responseText }]);
+    setAssistantTranscript(responseText);
+
+    // 2. Speak Response
+    speakResponse(responseText);
+
+  } catch (e) {
+    console.error(e);
+    setError("Failed to get response");
+  }
+};
+
+// ... (previous code)
+
+const handleGetAssessment = async () => {
+  if (!caseData || messages.length === 0 || isAssessing) return;
+
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  setIsAssessing(true);
+
+  try {
+    // Use client-side assessment service
+    const assessmentText = await getAssessment(
+      messages.map((m) => ({ role: m.role, content: m.text })),
+      caseData
+    );
+
+    // Parse or simply display the text? The previous API returned JSON object { assessment, hasCustomCriteria }.
+    // The new getAssessment returns a STRING markdown.
+    // We need to adapt the Assessment screen or just show it.
+    // Assuming Assessment screen can take raw text or we wrap it.
+
+    // Let's assume we pass the raw string as 'assessment'
+    navigation.navigate("Assessment", {
+      assessment: assessmentText,
+      hasCustomCriteria: false, // The new prompt handles it in text
+      patientName: caseData.patient_name,
+      chiefComplaint: caseData.chief_complaint,
+    });
+
+  } catch (error) {
+    console.error("Error getting assessment:", error);
+    setError("Failed to get assessment. Please try again.");
+  } finally {
+    setIsAssessing(false);
+  }
+};
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -273,230 +341,141 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     }
   }, [isListening]);
 
-  const connectToVoiceSession = useCallback(async () => {
-    if (!caseData) {
-      setError("No case data available");
-      return;
-    }
+  // --- CLIENT-SIDE VOICE LOGIC (Web Speech API) ---
+  const recognitionRef = useRef<any>(null);
+  const synthesisRef = useRef<SpeechSynthesis | null>(null);
 
-    if (Platform.OS !== "web") {
-      Alert.alert(
-        "Voice Mode",
-        "Voice mode is currently only available on web. Please use the web version of the app for voice conversations.",
-        [{ text: "OK", onPress: () => navigation.goBack() }]
-      );
+  const connectToVoiceSession = useCallback(async () => {
+    if (!caseData) return;
+
+    // Check for browser support
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError("Your browser does not support Voice Recognition. Try Chrome or Edge.");
       return;
     }
 
     setIsConnecting(true);
-    setSessionDuration(0); // Reset timer on new session
+    setSessionDuration(0);
     setError(null);
 
     try {
-      // Smart Permission Check
-      if (Platform.OS === 'web' && navigator.permissions && navigator.permissions.query) {
-        try {
-          const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-          if (permissionStatus.state === 'denied') {
-            setError("Browser blocked microphone. Please click the lock icon in your address bar to Allow.");
-            setIsConnecting(false);
-            return;
-          }
-        } catch (e) {
-          // Ignore if browser doesn't support query name 'microphone'
-          console.log("Permission query skipped:", e);
-        }
-      }
+      // Setup Recognition
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false; // We want turn-based
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-
-      const audioContext = new AudioContext({ sampleRate: 24000 });
-      if (audioContext.state === "suspended") {
-        await audioContext.resume();
-      }
-      audioContextRef.current = audioContext;
-
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
-
-      const baseUrl = getApiUrl().replace(/\/$/, "");
-      const wsUrl = baseUrl.replace(/^http/, "ws") + "/api/realtime";
-      console.log("Connecting to WebSocket:", wsUrl);
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        console.log("WebSocket connected, configuring session...");
-        ws.send(JSON.stringify({
-          type: "session.configure",
-          caseData: caseData,
-        }));
+      recognition.onstart = () => {
+        setIsListening(true);
+        setIsSpeaking(false);
       };
 
-      ws.onmessage = (event) => {
-        try {
-          const message = JSON.parse(event.data);
+      recognition.onend = () => {
+        setIsListening(false);
+        // If we are still connected and not speaking, maybe listen again? 
+        // For a simple prototype, we wait for user to press mic again or auto-restart?
+        // Let's keep it manual push-to-talk style for stability, or auto for flow.
+        // Let's do: if "isConnected" is true, wait a bit then start listening again 
+        // UNLESS we are processing a response.
+      };
 
-          switch (message.type) {
-            case "session.ready":
-              console.log("Session ready");
-              setIsConnected(true);
-              setIsConnecting(false);
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      recognition.onresult = async (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          setUserTranscript(transcript);
+          setMessages(prev => [...prev, { id: Date.now() + "-user", role: "user", text: transcript }]);
 
-              source.connect(processor);
-              const mutedGain = audioContext.createGain();
-              mutedGain.gain.value = 0;
-              mutedGain.connect(audioContext.destination);
-              processor.connect(mutedGain);
-
-              processor.onaudioprocess = (e) => {
-                const inputData = e.inputBuffer.getChannelData(0);
-
-                // Calculate volume (RMS) for pulse animation
-                if (wsRef.current?.readyState === WebSocket.OPEN) {
-                  let sum = 0;
-                  for (let i = 0; i < inputData.length; i++) {
-                    sum += inputData[i] * inputData[i];
-                  }
-                  const rms = Math.sqrt(sum / inputData.length);
-                  // Map RMS (0-1 usually small) to scale factor (1.0 - 1.5)
-                  // Adjust sensitivity factor (e.g. 5) as needed
-                  const sensitivity = 5;
-                  audioVolume.value = 1 + Math.min(rms * sensitivity, 0.5);
-                } else {
-                  audioVolume.value = withSpring(1);
-                }
-
-                const pcmData = floatTo16BitPCM(inputData);
-                const base64Audio = arrayBufferToBase64(pcmData.buffer);
-
-                if (wsRef.current?.readyState === WebSocket.OPEN) {
-                  wsRef.current.send(
-                    JSON.stringify({
-                      type: "audio.append",
-                      audio: base64Audio,
-                    })
-                  );
-                }
-              };
-              break;
-
-            case "speech.started":
-              setIsListening(true);
-              setUserTranscript("");
-              break;
-
-            case "speech.stopped":
-              setIsListening(false);
-              break;
-
-            case "transcript.done":
-              if (message.role === "user" && message.transcript) {
-                setMessages(prev => [...prev, {
-                  id: Date.now().toString() + "-user",
-                  role: "user",
-                  text: message.transcript,
-                }]);
-                setUserTranscript("");
-              } else if (message.role === "assistant" && message.transcript) {
-                setMessages(prev => [...prev, {
-                  id: Date.now().toString() + "-assistant",
-                  role: "assistant",
-                  text: message.transcript,
-                }]);
-                setAssistantTranscript("");
-              }
-              break;
-
-            case "transcript.delta":
-              if (message.role === "assistant") {
-                setAssistantTranscript((prev) => prev + (message.delta || ""));
-              }
-              break;
-
-            case "audio.delta":
-              setIsSpeaking(true);
-              playAudioChunk(message.delta);
-              break;
-
-            case "audio.done":
-              setIsSpeaking(false);
-              break;
-
-            case "response.done":
-              setIsSpeaking(false);
-              break;
-
-            case "error":
-              console.error("Voice error:", message.message);
-              setError(message.message);
-              break;
-
-            case "session.closed":
-              setIsConnected(false);
-              break;
-          }
-        } catch (e) {
-          console.error("Error parsing message:", e);
+          await processUserMessage(transcript);
         }
       };
 
-      ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        setError("Connection error. Please try again.");
-        setIsConnecting(false);
-      };
-
-      ws.onclose = () => {
-        console.log("WebSocket closed");
-        setIsConnected(false);
-        setIsConnecting(false);
-      };
-
-    } catch (err) {
-      if (err instanceof Error) {
-        console.error("Microphone access error details:", err.name, err.message);
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          setError("Microphone permission denied. Please allow access in settings.");
-        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-          setError("No microphone found. Please check your device.");
-        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-          setError("Microphone is busy or not readable. Close other apps using it.");
-        } else {
-          setError(`Microphone error: ${err.message}`);
+      recognition.onerror = (event: any) => {
+        console.error("Speech error", event.error);
+        if (event.error !== 'no-speech') {
+          // setError(event.error);
         }
-      } else {
-        setError("Failed to access microphone. Please check permissions.");
-      }
+      };
+
+      recognitionRef.current = recognition;
+
+      // Setup Synthesis
+      synthesisRef.current = window.speechSynthesis;
+
+      // "Connect" just means ready state here
+      setIsConnected(true);
+      setIsConnecting(false);
+      recognition.start(); // Start listening immediately
+
+    } catch (e: any) {
+      setError(e.message);
       setIsConnecting(false);
     }
-  }, [caseData, navigation, audioVolume]);
+  }, [caseData]);
+
+  const processUserMessage = async (text: string) => {
+    // Stop listening while thinking/speaking
+    setIsListening(false);
+
+    // 1. Get AI Response
+    try {
+      const responseText = await getChatCompletion(
+        [...messages, { role: "user", content: text }].map(m => ({ role: m.role as "user" | "assistant", content: m.text || m.content } as any)),
+        caseData!
+      );
+
+      setMessages(prev => [...prev, { id: Date.now() + "-ai", role: "assistant", text: responseText }]);
+      setAssistantTranscript(responseText);
+
+      // 2. Speak Response
+      speakResponse(responseText);
+
+    } catch (e) {
+      console.error(e);
+      setError("Failed to get response");
+    }
+  };
+
+  const speakResponse = (text: string) => {
+    if (!synthesisRef.current) return;
+
+    setIsSpeaking(true);
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    // Pick a voice if possible (Female for female patients, etc)
+    const voices = synthesisRef.current.getVoices();
+    // Simple heuristic
+    if (caseData?.gender === "Female") {
+      const femaleVoice = voices.find(v => v.name.includes("Female") || v.name.includes("Samantha"));
+      if (femaleVoice) utterance.voice = femaleVoice;
+    } else {
+      const maleVoice = voices.find(v => v.name.includes("Male") || v.name.includes("Daniel"));
+      if (maleVoice) utterance.voice = maleVoice;
+    }
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      // Auto-listen again after speaking
+      if (isConnected && recognitionRef.current) {
+        try { recognitionRef.current.start(); } catch { }
+      }
+    };
+
+    synthesisRef.current.speak(utterance);
+  };
 
   const disconnectVoiceSession = useCallback(() => {
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
     }
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      mediaStreamRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+    if (synthesisRef.current) {
+      synthesisRef.current.cancel();
+      synthesisRef.current = null;
     }
     setIsConnected(false);
     setIsListening(false);
     setIsSpeaking(false);
-    nextPlayTimeRef.current = 0;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }, []);
 
   const playAudioChunk = useCallback((base64Audio: string) => {
