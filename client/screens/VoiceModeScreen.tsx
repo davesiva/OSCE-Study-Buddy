@@ -58,121 +58,43 @@ type VoiceModeScreenProps = NativeStackScreenProps<RootStackParamList, "VoiceMod
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-function AudioVisualizer({ isActive, isSpeaking }: { isActive: boolean; isSpeaking: boolean }) {
+
+function PatientAvatar({
+  caseData,
+  isSpeaking,
+}: {
+  caseData: CaseData | null;
+  isSpeaking: boolean;
+}) {
   const { theme } = useTheme();
-  const bars = [
-    useSharedValue(0.3),
-    useSharedValue(0.5),
-    useSharedValue(0.4),
-    useSharedValue(0.6),
-    useSharedValue(0.3),
-  ];
-
-  useEffect(() => {
-    if (isActive || isSpeaking) {
-      bars.forEach((bar, index) => {
-        bar.value = withRepeat(
-          withSequence(
-            withTiming(0.2 + Math.random() * 0.8, {
-              duration: 150 + index * 50,
-              easing: Easing.inOut(Easing.ease),
-            }),
-            withTiming(0.1 + Math.random() * 0.5, {
-              duration: 150 + index * 50,
-              easing: Easing.inOut(Easing.ease),
-            })
-          ),
-          -1,
-          true
-        );
-      });
-    } else {
-      bars.forEach((bar) => {
-        cancelAnimation(bar);
-        bar.value = withTiming(0.15, { duration: 300 });
-      });
-    }
-  }, [isActive, isSpeaking]);
-
-  const barStyles = bars.map((bar, index) =>
-    useAnimatedStyle(() => ({
-      height: interpolate(bar.value, [0, 1], [8, 60]),
-      backgroundColor: isSpeaking ? theme.link : (isActive ? "#22C55E" : theme.tabIconDefault),
-    }))
-  );
-
-  return (
-    <View style={styles.visualizerContainer}>
-      {barStyles.map((style, index) => (
-        <Animated.View
-          key={index}
-          style={[styles.visualizerBar, style]}
-        />
-      ))}
-    </View>
-  );
-}
-
-function PatientAvatar({ caseData, isSpeaking }: { caseData: CaseData | null; isSpeaking: boolean }) {
-  const { theme } = useTheme();
-  const scale = useSharedValue(1);
-  const glowOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    if (isSpeaking) {
-      scale.value = withRepeat(
-        withSequence(
-          withTiming(1.05, { duration: 500 }),
-          withTiming(1, { duration: 500 })
-        ),
-        -1,
-        true
-      );
-      glowOpacity.value = withRepeat(
-        withSequence(
-          withTiming(0.5, { duration: 500 }),
-          withTiming(0.2, { duration: 500 })
-        ),
-        -1,
-        true
-      );
-    } else {
-      cancelAnimation(scale);
-      cancelAnimation(glowOpacity);
-      scale.value = withTiming(1, { duration: 200 });
-      glowOpacity.value = withTiming(0, { duration: 200 });
-    }
-  }, [isSpeaking]);
-
-  const avatarStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
-  }));
+  // Animation for the avatar glow
+  const glowStyle = useAnimatedStyle(() => {
+    return {
+      opacity: withTiming(isSpeaking ? 0.5 : 0, { duration: 300 }),
+      transform: [{ scale: withTiming(isSpeaking ? 1.2 : 1, { duration: 300 }) }],
+    };
+  });
 
   return (
     <View style={styles.avatarContainer}>
-      <Animated.View style={[styles.avatarGlow, { backgroundColor: theme.link }, glowStyle]} />
       <Animated.View
         style={[
           styles.avatar,
           { backgroundColor: theme.backgroundDefault },
-          avatarStyle,
+          glowStyle,
         ]}
       >
-        <Feather name="user" size={64} color={theme.link} />
+        <Feather name="user" size={20} color={theme.link} />
       </Animated.View>
       {caseData ? (
         <View style={styles.patientInfo}>
-          <ThemedText type="h4" style={styles.patientName}>
-            {caseData.patient_name}
-          </ThemedText>
-          <ThemedText style={styles.patientDetails}>
-            {caseData.age} years old, {caseData.gender}
-          </ThemedText>
-          <ThemedText style={styles.complaint} numberOfLines={2}>
+          <View style={styles.patientHeaderRow}>
+            <ThemedText style={styles.patientName}>{caseData.patient_name}</ThemedText>
+            <ThemedText style={styles.patientDetails}>
+              • {caseData.age} {caseData.gender === "Male" ? "M" : "F"}
+            </ThemedText>
+          </View>
+          <ThemedText style={styles.complaint} numberOfLines={1}>
             {caseData.chief_complaint}
           </ThemedText>
         </View>
@@ -181,12 +103,13 @@ function PatientAvatar({ caseData, isSpeaking }: { caseData: CaseData | null; is
   );
 }
 
-function TranscriptDisplay({ 
+
+function TranscriptDisplay({
   messages,
   currentUserTranscript,
   currentAssistantTranscript,
   isListening,
-}: { 
+}: {
   messages: VoiceMessage[];
   currentUserTranscript: string;
   currentAssistantTranscript: string;
@@ -200,29 +123,29 @@ function TranscriptDisplay({
   }, [messages, currentUserTranscript, currentAssistantTranscript]);
 
   return (
-    <ScrollView 
+    <ScrollView
       ref={scrollViewRef}
       style={styles.transcriptContainer}
       contentContainerStyle={styles.transcriptContent}
       showsVerticalScrollIndicator={false}
     >
       {messages.map((message) => (
-        <View 
+        <View
           key={message.id}
           style={[
-            styles.transcriptBubble, 
+            styles.transcriptBubble,
             message.role === "user" ? styles.userTranscript : styles.assistantTranscript,
             { backgroundColor: message.role === "user" ? theme.link : theme.backgroundDefault }
           ]}
         >
           <ThemedText style={[
-            styles.transcriptLabel, 
+            styles.transcriptLabel,
             message.role === "user" ? { color: "rgba(255,255,255,0.7)" } : { opacity: 0.7 }
           ]}>
             {message.role === "user" ? "You:" : "Patient:"}
           </ThemedText>
           <ThemedText style={[
-            styles.transcriptText, 
+            styles.transcriptText,
             message.role === "user" ? { color: "#FFFFFF" } : {}
           ]}>
             {message.text}
@@ -267,11 +190,40 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
   const caseData = route.params?.caseData as CaseData | undefined;
 
   const [isConnecting, setIsConnecting] = useState(false);
+  const audioVolume = useSharedValue(1); // 1 = 100% scale (base)
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [userTranscript, setUserTranscript] = useState("");
   const [assistantTranscript, setAssistantTranscript] = useState("");
+  const [sessionDuration, setSessionDuration] = useState(0);
+
+  // Timer logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isConnected) {
+      interval = setInterval(() => {
+        setSessionDuration((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isConnected]);
+
+  // Format seconds to MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getSystemMessage = (text: string, type: "error" | "info" = "info") => ({
+    id: Date.now().toString() + "-system-" + type,
+    role: "assistant", // System messages appear as assistant messages
+    text: text,
+    isSystem: true,
+    type: type,
+  });
+
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isAssessing, setIsAssessing] = useState(false);
@@ -337,13 +289,32 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     }
 
     setIsConnecting(true);
+    setSessionDuration(0); // Reset timer on new session
     setError(null);
 
     try {
+      // Smart Permission Check
+      if (Platform.OS === 'web' && navigator.permissions && navigator.permissions.query) {
+        try {
+          const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          if (permissionStatus.state === 'denied') {
+            setError("Browser blocked microphone. Please click the lock icon in your address bar to Allow.");
+            setIsConnecting(false);
+            return;
+          }
+        } catch (e) {
+          // Ignore if browser doesn't support query name 'microphone'
+          console.log("Permission query skipped:", e);
+        }
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
 
       const audioContext = new AudioContext({ sampleRate: 24000 });
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
       audioContextRef.current = audioContext;
 
       const source = audioContext.createMediaStreamSource(stream);
@@ -382,14 +353,33 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
               processor.connect(mutedGain);
 
               processor.onaudioprocess = (e) => {
+                const inputData = e.inputBuffer.getChannelData(0);
+
+                // Calculate volume (RMS) for pulse animation
                 if (wsRef.current?.readyState === WebSocket.OPEN) {
-                  const inputData = e.inputBuffer.getChannelData(0);
-                  const pcm16 = floatTo16BitPCM(inputData);
-                  const base64 = arrayBufferToBase64(pcm16.buffer);
-                  wsRef.current.send(JSON.stringify({
-                    type: "audio.append",
-                    audio: base64,
-                  }));
+                  let sum = 0;
+                  for (let i = 0; i < inputData.length; i++) {
+                    sum += inputData[i] * inputData[i];
+                  }
+                  const rms = Math.sqrt(sum / inputData.length);
+                  // Map RMS (0-1 usually small) to scale factor (1.0 - 1.5)
+                  // Adjust sensitivity factor (e.g. 5) as needed
+                  const sensitivity = 5;
+                  audioVolume.value = 1 + Math.min(rms * sensitivity, 0.5);
+                } else {
+                  audioVolume.value = withSpring(1);
+                }
+
+                const pcmData = floatTo16BitPCM(inputData);
+                const base64Audio = arrayBufferToBase64(pcmData.buffer);
+
+                if (wsRef.current?.readyState === WebSocket.OPEN) {
+                  wsRef.current.send(
+                    JSON.stringify({
+                      type: "audio.append",
+                      audio: base64Audio,
+                    })
+                  );
                 }
               };
               break;
@@ -467,11 +457,23 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
       };
 
     } catch (err) {
-      console.error("Error connecting:", err);
-      setError("Failed to access microphone. Please grant permission and try again.");
+      if (err instanceof Error) {
+        console.error("Microphone access error details:", err.name, err.message);
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setError("Microphone permission denied. Please allow access in settings.");
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          setError("No microphone found. Please check your device.");
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          setError("Microphone is busy or not readable. Close other apps using it.");
+        } else {
+          setError(`Microphone error: ${err.message}`);
+        }
+      } else {
+        setError("Failed to access microphone. Please check permissions.");
+      }
       setIsConnecting(false);
     }
-  }, [caseData, navigation]);
+  }, [caseData, navigation, audioVolume]);
 
   const disconnectVoiceSession = useCallback(() => {
     if (processorRef.current) {
@@ -505,7 +507,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
       const float32 = pcm16ToFloat32(new Int16Array(audioData));
 
       const audioBuffer = audioContextRef.current.createBuffer(1, float32.length, 24000);
-      audioBuffer.copyToChannel(float32 as unknown as Float32Array<ArrayBuffer>, 0);
+      audioBuffer.copyToChannel(float32 as any, 0);
 
       const source = audioContextRef.current.createBufferSource();
       source.buffer = audioBuffer;
@@ -570,19 +572,33 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     }
   };
 
+  const audioPulseStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: withSpring(audioVolume.value) }],
+    };
+  });
+
   return (
     <ThemedView style={styles.container}>
-      <View style={[styles.content, { paddingTop: headerHeight + Spacing.xl }]}>
-        <PatientAvatar caseData={caseData || null} isSpeaking={isSpeaking} />
+      <View style={[styles.content, { paddingTop: headerHeight + Spacing.sm }]}>
+        <View style={styles.headerBar}>
+          <PatientAvatar caseData={caseData || null} isSpeaking={isSpeaking} />
+          <View style={styles.timerContainer}>
+            <Feather name="clock" size={14} color={isConnected ? theme.link : theme.tabIconDefault} style={{ marginRight: 4 }} />
+            <ThemedText style={[styles.timerText, { color: isConnected ? theme.link : theme.tabIconDefault }]}>
+              {formatTime(sessionDuration)}
+            </ThemedText>
+          </View>
+        </View>
 
-        <AudioVisualizer isActive={isListening} isSpeaking={isSpeaking} />
-
-        <TranscriptDisplay
-          messages={messages}
-          currentUserTranscript={userTranscript}
-          currentAssistantTranscript={assistantTranscript}
-          isListening={isListening}
-        />
+        <View style={{ flex: 1, width: "100%" }}>
+          <TranscriptDisplay
+            messages={messages}
+            currentUserTranscript={userTranscript}
+            currentAssistantTranscript={assistantTranscript}
+            isListening={isListening}
+          />
+        </View>
 
         {error ? (
           <View style={[styles.errorContainer, { backgroundColor: "rgba(239,68,68,0.1)" }]}>
@@ -616,23 +632,57 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
               >
                 <Feather
                   name="mic-off"
-                  size={40}
+                  size={24}
                   color="#FFFFFF"
                 />
               </AnimatedPressable>
             </View>
-          ) : null}
+          ) : (
+            <View style={styles.micButtonContainer}>
+              {isListening && !isConnecting && (
+                <Animated.View
+                  style={[
+                    styles.pulse,
+                    {
+                      backgroundColor: isSpeaking ? theme.link : theme.link,
+                      opacity: 0.3,
+                    },
+                    audioPulseStyle,
+                  ]}
+                />
+              )}
+              <AnimatedPressable
+                onPress={handleMicPress}
+                disabled={isConnecting}
+                style={[
+                  styles.micButton,
+                  {
+                    backgroundColor: isConnecting
+                      ? theme.tabIconDefault
+                      : theme.link,
+                  },
+                  micButtonStyle,
+                ]}
+              >
+                <Feather
+                  name="mic"
+                  size={24}
+                  color="#FFFFFF"
+                />
+              </AnimatedPressable>
+            </View>
+          )}
 
           <ThemedText style={styles.statusText}>
             {isConnecting
               ? "Connecting..."
               : isConnected
-              ? isListening
-                ? "Listening to you..."
-                : isSpeaking
-                ? "Patient is speaking..."
-                : "Session active"
-              : "Tap to Start"}
+                ? isListening
+                  ? "Listening to you..."
+                  : isSpeaking
+                    ? "Patient is speaking..."
+                    : "Session active"
+                : "Tap to Start"}
           </ThemedText>
 
           {isConnected ? (
@@ -712,50 +762,74 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    alignItems: "center",
     paddingHorizontal: Spacing.lg,
   },
-  avatarContainer: {
+  headerBar: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: Spacing["3xl"],
+    justifyContent: "space-between",
+    marginBottom: Spacing.sm,
+    paddingBottom: Spacing.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(0,0,0,0.1)",
   },
-  avatarGlow: {
-    position: "absolute",
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+  timerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.03)",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  timerText: {
+    fontSize: 14,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "500",
+  },
+  avatarContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
   },
   avatar: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    marginRight: Spacing.sm,
   },
   patientInfo: {
-    alignItems: "center",
-    marginTop: Spacing.lg,
+    justifyContent: "center",
+    flex: 1,
+  },
+  patientHeaderRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    flexWrap: "wrap",
   },
   patientName: {
-    textAlign: "center",
+    fontSize: 15,
+    fontWeight: "600",
+    marginRight: 6,
   },
   patientDetails: {
+    fontSize: 13,
     opacity: 0.7,
-    marginTop: Spacing.xs,
   },
   complaint: {
     opacity: 0.6,
-    marginTop: Spacing.sm,
-    textAlign: "center",
-    fontSize: 14,
+    fontSize: 12,
+    marginTop: 0,
   },
   visualizerContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 80,
-    gap: 8,
-    marginBottom: Spacing.xl,
+    height: 40,
+    gap: 4,
+    marginBottom: Spacing.md,
+    alignSelf: "center",
   },
   visualizerBar: {
     width: 8,
@@ -814,6 +888,8 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderRadius: BorderRadius.md,
     marginBottom: Spacing.lg,
+    alignSelf: "center",
+    width: "100%",
   },
   errorText: {
     marginLeft: Spacing.sm,
@@ -822,7 +898,8 @@ const styles = StyleSheet.create({
   },
   controlsContainer: {
     alignItems: "center",
-    paddingTop: Spacing.xl,
+    paddingTop: Spacing.md,
+    width: "100%",
   },
   micButtonContainer: {
     position: "relative",
@@ -831,14 +908,14 @@ const styles = StyleSheet.create({
   },
   pulse: {
     position: "absolute",
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
   },
   micButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
   },

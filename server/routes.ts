@@ -33,7 +33,7 @@ interface ChatMessage {
 }
 
 function buildSystemPrompt(caseData: CaseData): string {
-  
+
   return `You are a standardized patient in an OSCE (Objective Structured Clinical Examination) simulation for medical students. Your goal is to behave like a REAL patient, not a textbook.
 
 CHARACTER PROFILE:
@@ -114,19 +114,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const casesDir = path.resolve(process.cwd(), "cases");
       const cases: CaseData[] = [];
-      
+
       if (fs.existsSync(casesDir)) {
         const files = fs.readdirSync(casesDir);
         for (const file of files) {
           if (file.endsWith(".json")) {
-            const filePath = path.join(casesDir, file);
-            const content = fs.readFileSync(filePath, "utf-8");
-            const caseData = JSON.parse(content) as CaseData;
-            cases.push(caseData);
+            try {
+              const filePath = path.join(casesDir, file);
+              const content = fs.readFileSync(filePath, "utf-8");
+              const caseData = JSON.parse(content) as CaseData;
+              cases.push(caseData);
+            } catch (err) {
+              console.error(`Failed to load case file ${file}:`, err);
+            }
           }
         }
       }
-      
+
       res.json(cases);
     } catch (error) {
       console.error("Error loading cases:", error);
@@ -139,7 +143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { caseId } = req.params;
       const casesDir = path.resolve(process.cwd(), "cases");
-      
+
       if (fs.existsSync(casesDir)) {
         const files = fs.readdirSync(casesDir);
         for (const file of files) {
@@ -154,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       res.status(404).json({ error: "Case not found" });
     } catch (error) {
       console.error("Error loading case:", error);
@@ -199,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/feedback", (req: Request, res: Response) => {
     try {
       const { feedback, rating } = req.body as { feedback: string; rating: string };
-      
+
       if (!feedback) {
         res.status(400).json({ error: "Feedback is required" });
         return;
@@ -208,11 +212,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const feedbackFile = path.resolve(process.cwd(), "feedback.csv");
       const timestamp = new Date().toISOString();
       const line = `"${timestamp}","${feedback.replace(/"/g, '""')}","${rating}"\n`;
-      
+
       if (!fs.existsSync(feedbackFile)) {
         fs.writeFileSync(feedbackFile, "timestamp,feedback,rating\n");
       }
-      
+
       fs.appendFileSync(feedbackFile, line);
       res.json({ success: true });
     } catch (error) {
@@ -225,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/generate-case", async (req: Request, res: Response) => {
     try {
       const { specialty, difficulty } = req.body as { specialty: string; difficulty: string };
-      
+
       if (!specialty) {
         res.status(400).json({ error: "Specialty is required" });
         return;
@@ -339,7 +343,7 @@ Return ONLY the JSON object, no additional text.`;
       });
 
       const responseText = response.choices[0]?.message?.content || "";
-      
+
       let extractedData;
       try {
         const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
@@ -366,7 +370,7 @@ Return ONLY the JSON object, no additional text.`;
   app.post("/api/cases", (req: Request, res: Response) => {
     try {
       const caseData = req.body as CaseData & { is_custom?: boolean };
-      
+
       if (!caseData.patient_name || !caseData.chief_complaint) {
         res.status(400).json({ error: "Patient name and chief complaint are required" });
         return;
@@ -379,9 +383,9 @@ Return ONLY the JSON object, no additional text.`;
 
       const fileName = `case_custom_${caseData.case_id || Date.now()}.json`;
       const filePath = path.join(casesDir, fileName);
-      
+
       fs.writeFileSync(filePath, JSON.stringify(caseData, null, 2));
-      
+
       res.json({ success: true, case_id: caseData.case_id, fileName });
     } catch (error) {
       console.error("Error saving case:", error);
@@ -393,7 +397,7 @@ Return ONLY the JSON object, no additional text.`;
   app.post("/api/parse-case", async (req: Request, res: Response) => {
     try {
       const { content } = req.body as { content: string };
-      
+
       if (!content) {
         res.status(400).json({ error: "PDF content is required" });
         return;
@@ -443,7 +447,7 @@ ${content}`;
       });
 
       const responseText = response.choices[0]?.message?.content || "";
-      
+
       // Try to parse the JSON from the response
       let extractedData;
       try {
@@ -473,7 +477,7 @@ ${content}`;
   app.post("/api/parse-calibration", async (req: Request, res: Response) => {
     try {
       const { content } = req.body as { content: string };
-      
+
       if (!content) {
         res.status(400).json({ error: "Calibration document content is required" });
         return;
@@ -507,7 +511,7 @@ ${content}`;
       });
 
       const assessmentCriteria = response.choices[0]?.message?.content || "";
-      
+
       res.json({ success: true, assessment_criteria: assessmentCriteria });
     } catch (error) {
       console.error("Error parsing calibration:", error);
@@ -592,9 +596,9 @@ MISSED OPPORTUNITIES:
       });
 
       const assessment = response.choices[0]?.message?.content || "Unable to generate assessment.";
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         assessment,
         hasCustomCriteria: !!caseData.assessment_criteria
       });
@@ -609,9 +613,9 @@ MISSED OPPORTUNITIES:
     try {
       const { caseId } = req.params;
       const { assessment_criteria } = req.body as { assessment_criteria: string };
-      
+
       const casesDir = path.resolve(process.cwd(), "cases");
-      
+
       if (fs.existsSync(casesDir)) {
         const files = fs.readdirSync(casesDir);
         for (const file of files) {
@@ -628,7 +632,7 @@ MISSED OPPORTUNITIES:
           }
         }
       }
-      
+
       res.status(404).json({ error: "Case not found" });
     } catch (error) {
       console.error("Error updating case criteria:", error);
@@ -642,7 +646,7 @@ MISSED OPPORTUNITIES:
   });
 
   const httpServer = createServer(app);
-  
+
   setupRealtimeWebSocket(httpServer);
 
   return httpServer;

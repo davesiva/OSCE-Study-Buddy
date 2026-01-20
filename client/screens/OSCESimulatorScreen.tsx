@@ -28,8 +28,10 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { CASES } from "@/data/cases";
+import { apiRequest } from "@/lib/query-client";
+import { getChatCompletion, getAssessment } from "@/lib/openai-service";
 
 interface CaseData {
   case_id: string;
@@ -322,11 +324,20 @@ export default function OSCESimulatorScreen() {
   const loadCases = async () => {
     try {
       setIsLoading(true);
-      
-      const baseUrl = getApiUrl();
-      const response = await fetch(new URL("/api/cases", baseUrl).toString());
-      const serverCases = await response.json();
-      
+      let serverCases: CaseData[] = [];
+      try {
+        if (Platform.OS === 'web') {
+          const res = await apiRequest("GET", "/api/cases");
+          serverCases = await res.json();
+        } else {
+          // Fallback to bundled for native if not using a tunnel/IP
+          serverCases = CASES as unknown as CaseData[];
+        }
+      } catch (e) {
+        console.warn("Failed to fetch cases from server, using bundled:", e);
+        serverCases = CASES as unknown as CaseData[];
+      }
+
       let localCases: CaseData[] = [];
       try {
         const localCasesJson = await AsyncStorage.getItem(LOCAL_CASES_KEY);
@@ -336,7 +347,7 @@ export default function OSCESimulatorScreen() {
       } catch (e) {
         console.error("Error loading local cases:", e);
       }
-      
+
       const allCases = [...serverCases, ...localCases];
       setCases(allCases);
       if (allCases.length > 0) {
@@ -392,17 +403,16 @@ export default function OSCESimulatorScreen() {
     setIsSending(true);
 
     try {
-      const response = await apiRequest("POST", "/api/chat", {
-        messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
-        caseData: selectedCase,
-      });
-
-      const data = await response.json();
+      // Use client-side OpenAI service
+      const responseContent = await getChatCompletion(
+        newMessages.map((m) => ({ role: m.role, content: m.content })),
+        selectedCase
+      );
 
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.content,
+        content: responseContent,
       };
 
       const updatedMessages = [...newMessages, assistantMessage];
@@ -413,7 +423,7 @@ export default function OSCESimulatorScreen() {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "I'm sorry, I'm having trouble responding right now. Please try again.",
+        content: "I'm sorry, I'm having trouble responding right now. Please check your internet connection.",
       };
       const updatedMessages = [...newMessages, errorMessage];
       setMessages(updatedMessages);
@@ -437,21 +447,18 @@ export default function OSCESimulatorScreen() {
     setIsAssessing(true);
 
     try {
-      const response = await apiRequest("POST", "/api/assess", {
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        caseData: selectedCase,
+      // Use client-side OpenAI service
+      const assessment = await getAssessment(
+        messages.map((m) => ({ role: m.role, content: m.content })),
+        selectedCase
+      );
+
+      navigation.navigate("Assessment", {
+        assessment: assessment,
+        hasCustomCriteria: false, // bundled cases don't have custom criteria currently
+        patientName: selectedCase.patient_name,
+        chiefComplaint: selectedCase.chief_complaint,
       });
-
-      const data = await response.json();
-
-      if (data.success) {
-        navigation.navigate("Assessment", {
-          assessment: data.assessment,
-          hasCustomCriteria: data.hasCustomCriteria,
-          patientName: selectedCase.patient_name,
-          chiefComplaint: selectedCase.chief_complaint,
-        });
-      }
     } catch (error) {
       console.error("Error getting assessment:", error);
     } finally {
@@ -586,7 +593,11 @@ export default function OSCESimulatorScreen() {
             ]}
           >
             <TextInput
-              style={[styles.input, { color: theme.text }]}
+              style={[
+                styles.input,
+                { color: theme.text },
+                Platform.select({ web: { outlineStyle: "none" } as any }),
+              ]}
               placeholder="Type your question..."
               placeholderTextColor={theme.tabIconDefault}
               value={inputText}
@@ -594,6 +605,12 @@ export default function OSCESimulatorScreen() {
               multiline
               maxLength={500}
               editable={!isSending && !!selectedCase}
+              onKeyPress={(e) => {
+                if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !(e as any).shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
             />
             <AnimatedPressable
               onPress={handleSend}
@@ -698,7 +715,7 @@ const styles = StyleSheet.create({
     }),
   },
   caseDropdownScroll: {
-    maxHeight: 240,
+    maxHeight: 400,
   },
   caseOption: {
     paddingVertical: Spacing.md,
@@ -893,7 +910,7 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     borderRadius: BorderRadius.xl,
     paddingLeft: Spacing.lg,
     paddingRight: Spacing.sm,
