@@ -106,9 +106,45 @@ IMPORTANT RULES:
 - Do not diagnose yourself or suggest what condition you might have
 - Show appropriate emotions (pain, worry, confusion) naturally
 - If the student asks something inappropriate, redirect politely as a patient would`;
+  // ... (keep existing prompt code)
+}
+
+function tryParseJSON(text: string): any {
+  try {
+    // 1. Try direct parse
+    return JSON.parse(text);
+  } catch (e) {
+    // 2. Try to find a JSON block with markdown markers
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[1].trim());
+      } catch (e2) {
+        // continue
+      }
+    }
+
+    // 3. Try to find the first { and last }
+    const jsonStart = text.indexOf("{");
+    const jsonEnd = text.lastIndexOf("}");
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      try {
+        return JSON.parse(text.slice(jsonStart, jsonEnd + 1));
+      } catch (e3) {
+        // continue
+      }
+    }
+
+    throw new Error("Could not parse JSON from response");
+  }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Check for API Key immediately
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("CRITICAL: OPENAI_API_KEY is missing from environment variables.");
+  }
+
   // Get all cases
   app.get("/api/cases", (_req: Request, res: Response) => {
     try {
@@ -343,20 +379,14 @@ Return ONLY the JSON object, no additional text.`;
       });
 
       const responseText = response.choices[0]?.message?.content || "";
+      console.log("Raw OpenAI Response for Generate Case:", responseText); // Added logging
 
       let extractedData;
       try {
-        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        const jsonText = jsonMatch ? jsonMatch[1] : responseText;
-        extractedData = JSON.parse(jsonText.trim());
-      } catch {
-        const jsonStart = responseText.indexOf("{");
-        const jsonEnd = responseText.lastIndexOf("}");
-        if (jsonStart !== -1 && jsonEnd !== -1) {
-          extractedData = JSON.parse(responseText.slice(jsonStart, jsonEnd + 1));
-        } else {
-          throw new Error("Could not parse JSON from AI response");
-        }
+        extractedData = tryParseJSON(responseText);
+      } catch (error) {
+        console.error("JSON Parsing failed. Response text was:", responseText);
+        throw new Error("Could not parse JSON from AI response");
       }
 
       res.json({ success: true, data: extractedData });
@@ -447,23 +477,15 @@ ${content}`;
       });
 
       const responseText = response.choices[0]?.message?.content || "";
+      console.log("Raw OpenAI Response for Parse Case:", responseText); // Added logging
 
       // Try to parse the JSON from the response
       let extractedData;
       try {
-        // Remove markdown code blocks if present
-        const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        const jsonText = jsonMatch ? jsonMatch[1] : responseText;
-        extractedData = JSON.parse(jsonText.trim());
-      } catch {
-        // If parsing fails, try to find JSON object in the text
-        const jsonStart = responseText.indexOf("{");
-        const jsonEnd = responseText.lastIndexOf("}");
-        if (jsonStart !== -1 && jsonEnd !== -1) {
-          extractedData = JSON.parse(responseText.slice(jsonStart, jsonEnd + 1));
-        } else {
-          throw new Error("Could not parse JSON from AI response");
-        }
+        extractedData = tryParseJSON(responseText);
+      } catch (error) {
+        console.error("JSON Parsing failed. Response text was:", responseText);
+        throw new Error("Could not parse JSON from AI response");
       }
 
       res.json({ success: true, data: extractedData });

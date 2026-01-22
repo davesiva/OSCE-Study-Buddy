@@ -296,6 +296,13 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
   const [error, setError] = useState<string | null>(null);
   const [isAssessing, setIsAssessing] = useState(false);
 
+  const messagesRef = useRef<VoiceMessage[]>([]);
+
+  // Update ref whenever messages change
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -383,9 +390,14 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
       recognition.onresult = async (event: any) => {
         const transcript = event.results[0][0].transcript;
         if (transcript) {
-          setUserTranscript(transcript);
-          setMessages(prev => [...prev, { id: Date.now() + "-user", role: "user", text: transcript }]);
+          // Clear the "live" transcript since we are about to add it to the committed messages
+          setUserTranscript("");
 
+          const newMessage: VoiceMessage = { id: Date.now() + "-user", role: "user", text: transcript };
+          setMessages(prev => [...prev, newMessage]);
+
+          // Use the internal function which now uses the ref, OR pas the new list manually?
+          // To be safe, let's call a version of processUserMessage that takes the text
           await processUserMessage(transcript);
         }
       };
@@ -419,8 +431,19 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
 
     // 1. Get AI Response
     try {
+      // Use the ref to ensure we have the latest messages, including the one we just added (or about to add? state update might be async)
+      // Actually, since we just called setMessages in onresult, the Ref might NOT be updated yet!
+      // SAFE BET: Append the new user message to the CURRENT ref value manually for the API call.
+      const currentHistory = messagesRef.current;
+      // We also need to include the NEW message 'text' which might not be in the ref yet if setMessages hasn't flushed.
+
+      const fullHistory = [
+        ...currentHistory,
+        { role: "user", text: text } as VoiceMessage
+      ].map(m => ({ role: m.role as "user" | "assistant", content: m.text }));
+
       const responseText = await getChatCompletion(
-        [...messages, { role: "user", content: text }].map(m => ({ role: m.role as "user" | "assistant", content: m.text || m.content } as any)),
+        fullHistory,
         caseData!
       );
 
@@ -522,35 +545,6 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     }
   };
 
-  const handleGetAssessment = async () => {
-    if (!caseData || messages.length === 0 || isAssessing) return;
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setIsAssessing(true);
-
-    try {
-      const response = await apiRequest("POST", "/api/assess", {
-        messages: messages.map((m) => ({ role: m.role, content: m.text })),
-        caseData: caseData,
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        navigation.navigate("Assessment", {
-          assessment: data.assessment,
-          hasCustomCriteria: data.hasCustomCriteria,
-          patientName: caseData.patient_name,
-          chiefComplaint: caseData.chief_complaint,
-        });
-      }
-    } catch (error) {
-      console.error("Error getting assessment:", error);
-      setError("Failed to get assessment. Please try again.");
-    } finally {
-      setIsAssessing(false);
-    }
-  };
 
   const audioPulseStyle = useAnimatedStyle(() => {
     return {

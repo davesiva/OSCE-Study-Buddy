@@ -304,6 +304,27 @@ export default function OSCESimulatorScreen() {
   const [isSending, setIsSending] = useState(false);
   const [isAssessing, setIsAssessing] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [sessionDuration, setSessionDuration] = useState(0);
+
+  // Timer logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    // Start timer if a case is selected
+    if (selectedCase) {
+      interval = setInterval(() => {
+        setSessionDuration((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [selectedCase]);
+
+  // Format seconds to MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
 
   const sendScale = useSharedValue(1);
 
@@ -508,7 +529,17 @@ export default function OSCESimulatorScreen() {
             onOpenChange={setIsDropdownOpen}
           />
 
+          {selectedCase && (
+            <View style={styles.timerContainer}>
+              <Feather name="clock" size={12} color={theme.tabIconDefault} style={{ marginRight: 4 }} />
+              <ThemedText style={[styles.timerText, { color: theme.tabIconDefault }]}>
+                {formatTime(sessionDuration)}
+              </ThemedText>
+            </View>
+          )}
+
           {selectedCase ? <PatientDetails caseData={selectedCase} /> : null}
+
 
           <View style={styles.actionButtons}>
             {selectedCase ? (
@@ -667,6 +698,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
     zIndex: 1000,
+  },
+  timerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: Spacing.xs,
+    alignSelf: "flex-end", // Position it nicely, or maybe inline with selector?
+    // Let's put it below selector but above details
+    marginTop: -8, // slight tuck
+    marginBottom: 8,
+  },
+  timerText: {
+    fontSize: 12,
+    fontVariant: ["tabular-nums"],
+    fontWeight: "500",
   },
   caseSelectorContainer: {
     marginBottom: Spacing.sm,
