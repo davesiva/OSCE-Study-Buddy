@@ -30,7 +30,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { MedicalIcon, MedicalIconType } from "@/components/MedicalIcons";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { getApiUrl } from "@/lib/query-client";
-import { generateCase } from "@/lib/openai-service";
+import { generateCase } from "@/lib/gemini-service";
 
 const LOCAL_CASES_KEY = "custom_cases_local";
 

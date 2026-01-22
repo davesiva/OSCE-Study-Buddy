@@ -31,7 +31,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { CASES } from "@/data/cases";
 import { apiRequest } from "@/lib/query-client";
-import { getChatCompletion, getAssessment } from "@/lib/openai-service";
+import { getChatCompletion, getAssessment } from "@/lib/gemini-service";
 
 interface CaseData {
   case_id: string;

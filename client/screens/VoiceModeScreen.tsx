@@ -36,7 +36,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
-import { getChatCompletion, getAssessment } from "@/lib/openai-service";
+import { getChatCompletion, getAssessment, transcribeAudio } from "@/lib/gemini-service";
 
 interface CaseData {
   case_id: string;
@@ -58,71 +58,6 @@ type VoiceModeScreenProps = NativeStackScreenProps<RootStackParamList, "VoiceMod
 
 // ... (previous code)
 
-const processUserMessage = async (text: string) => {
-  // Stop listening while thinking/speaking
-  setIsListening(false);
-
-  // 1. Get AI Response
-  try {
-    // Combine existing messages with the new user input
-    const conversationHistory = messages.map(m => ({
-      role: m.role as "user" | "assistant",
-      content: m.text
-    }));
-    conversationHistory.push({ role: "user", content: text });
-
-    const responseText = await getChatCompletion(
-      conversationHistory,
-      caseData!
-    );
-
-    setMessages(prev => [...prev, { id: Date.now() + "-ai", role: "assistant", text: responseText }]);
-    setAssistantTranscript(responseText);
-
-    // 2. Speak Response
-    speakResponse(responseText);
-
-  } catch (e) {
-    console.error(e);
-    setError("Failed to get response");
-  }
-};
-
-// ... (previous code)
-
-const handleGetAssessment = async () => {
-  if (!caseData || messages.length === 0 || isAssessing) return;
-
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-  setIsAssessing(true);
-
-  try {
-    // Use client-side assessment service
-    const assessmentText = await getAssessment(
-      messages.map((m) => ({ role: m.role, content: m.text })),
-      caseData
-    );
-
-    // Parse or simply display the text? The previous API returned JSON object { assessment, hasCustomCriteria }.
-    // The new getAssessment returns a STRING markdown.
-    // We need to adapt the Assessment screen or just show it.
-    // Assuming Assessment screen can take raw text or we wrap it.
-
-    // Let's assume we pass the raw string as 'assessment'
-    navigation.navigate("Assessment", {
-      assessment: assessmentText,
-      hasCustomCriteria: false, // The new prompt handles it in text
-      patientName: caseData.patient_name,
-      chiefComplaint: caseData.chief_complaint,
-    });
-
-  } catch (error) {
-    console.error("Error getting assessment:", error);
-    setError("Failed to get assessment. Please try again.");
-  } finally {
-    setIsAssessing(false);
-  }
-};
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -258,7 +193,6 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
   const caseData = route.params?.caseData as CaseData | undefined;
 
   const [isConnecting, setIsConnecting] = useState(false);
-  const audioVolume = useSharedValue(1); // 1 = 100% scale (base)
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -303,18 +237,34 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     messagesRef.current = messages;
   }, [messages]);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const audioChunksRef = useRef<Float32Array[]>([]);
-  const audioQueueRef = useRef<ArrayBuffer[]>([]);
-  const isPlayingRef = useRef(false);
-  const nextPlayTimeRef = useRef(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  const micScale = useSharedValue(1);
+  // Audio Recording Refs
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Synthesis Ref (Restored)
+  const synthesisRef = useRef<SpeechSynthesis | null>(null);
+
+  // Setup Synthesis on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      synthesisRef.current = window.speechSynthesis;
+    }
+  }, []);
+
+  // Constants for VAD (Voice Activity Detection)
+  const SILENCE_THRESHOLD = 0.02; // Volume threshold
+  const SILENCE_DURATION = 1500; // ms of silence to trigger stop
+
+  // Visualizer Only
   const pulseScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(0);
+  const micScale = useSharedValue(1); // Restored
 
   const micButtonStyle = useAnimatedStyle(() => ({
     transform: [{ scale: micScale.value }],
@@ -348,101 +298,158 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     }
   }, [isListening]);
 
-  // --- CLIENT-SIDE VOICE LOGIC (Web Speech API) ---
-  const recognitionRef = useRef<any>(null);
-  const synthesisRef = useRef<SpeechSynthesis | null>(null);
+  // --- WHISPER RECORDING LOGIC ---
 
-  // Refs for state that needs to be accessed in callbacks/closures without staleness
-  const isListeningRef = useRef(false);
-  const isConnectedRef = useRef(false);
-  const isProcessingRef = useRef(false);
+  const startRecording = async () => {
+    try {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") return;
 
-  // Sync refs with state
-  useEffect(() => {
-    isListeningRef.current = isListening;
-    isConnectedRef.current = isConnected;
-  }, [isListening, isConnected]);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Setup Audio Analysis (for silence detection + visuals)
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+
+      // Start MediaRecorder
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+
+        // Cancel silence timer
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+        if (audioContextRef.current) audioContextRef.current.close();
+
+        setIsListening(false);
+
+        // Process Audio
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (audioBlob.size > 1000) { // arbitrary small size check
+          await processUserAudio(audioBlob);
+        } else {
+          // Audio too short/empty
+          if (isConnected) startRecording(); // Auto-restart if just a glitch? 
+          // Or just wait for user. Let's wait.
+        }
+      };
+
+      mediaRecorder.start();
+      setIsListening(true);
+      setIsSpeaking(false);
+
+      // Start Silence Detection Loop
+      checkSilence();
+
+    } catch (e: any) {
+      console.error("Error starting recording:", e);
+      setError("Could not access microphone: " + e.message);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const checkSilence = () => {
+    if (!analyserRef.current) return;
+
+    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+    analyserRef.current.getByteFrequencyData(dataArray);
+
+    // Calculate average volume
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += dataArray[i];
+    }
+    const average = sum / dataArray.length;
+    const volume = average / 255; // 0 to 1
+
+    // Visuals
+    pulseScale.value = withTiming(1 + volume, { duration: 100 });
+    pulseOpacity.value = withTiming(volume > 0.01 ? 0.5 : 0, { duration: 100 });
+
+    // Silence Logic
+    if (volume < SILENCE_THRESHOLD) {
+      if (!silenceTimerRef.current) {
+        silenceTimerRef.current = setTimeout(() => {
+          stopRecording();
+        }, SILENCE_DURATION);
+      }
+    } else {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+    }
+
+    animationFrameRef.current = requestAnimationFrame(checkSilence);
+  };
 
   const connectToVoiceSession = useCallback(async () => {
     if (!caseData) return;
-
-    // Check for browser support
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setError("Your browser does not support Voice Recognition. Try Chrome or Edge.");
-      return;
-    }
-
     setIsConnecting(true);
     setSessionDuration(0);
     setError(null);
+    setIsConnected(true);
+    setIsConnecting(false);
 
-    try {
-      // Setup Recognition
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false; // We want turn-based
-      recognition.interimResults = false;
-      recognition.lang = "en-US";
+    // Auto-start recording
+    startRecording();
 
-      recognition.onstart = () => {
-        setIsListening(true);
-        setIsSpeaking(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognition.onresult = async (event: any) => {
-        // If we are already processing a result, ignore subsequent events (prevent double-fire)
-        if (isProcessingRef.current) return;
-
-        const transcript = event.results[0][0].transcript;
-        if (transcript) {
-          isProcessingRef.current = true; // Lock processing
-
-          // Clear the "live" transcript
-          setUserTranscript("");
-
-          const newMessage: VoiceMessage = { id: Date.now() + "-user", role: "user", text: transcript };
-          setMessages(prev => [...prev, newMessage]);
-
-          await processUserMessage(transcript);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error("Speech error", event.error);
-        if (event.error !== 'no-speech') {
-          // setError(event.error);
-        }
-      };
-
-      recognitionRef.current = recognition;
-
-      // Setup Synthesis
-      synthesisRef.current = window.speechSynthesis;
-
-      // "Connect" just means ready state here
-      setIsConnected(true);
-      setIsConnecting(false);
-      recognition.start(); // Start listening immediately
-
-    } catch (e: any) {
-      setError(e.message);
-      setIsConnecting(false);
-    }
   }, [caseData]);
 
-  const processUserMessage = async (text: string) => {
-    // Stop listening while thinking/speaking
-    setIsListening(false);
+  const processUserAudio = async (audioBlob: Blob) => {
+    setIsProcessing(true);
+    try {
+      // 1. Transcribe (Whisper)
+      const transcript = await transcribeAudio(audioBlob);
 
+      if (!transcript || !transcript.trim()) {
+        setIsProcessing(false);
+        if (isConnected) startRecording(); // Restart if nothing heard
+        return;
+      }
+
+      setUserTranscript(""); // Clear old live text if any
+
+      // Add User Message
+      const newMessage: VoiceMessage = { id: Date.now() + "-user", role: "user", text: transcript };
+      setMessages(prev => [...prev, newMessage]);
+
+      // 2. Chat Completion
+      await processUserMessageText(transcript);
+
+    } catch (e: any) {
+      console.error("Processing error:", e);
+      setError("Error processing speech: " + e.message);
+      setIsProcessing(false);
+      // If error is transient, maybe don't restart? Or manual restart required.
+    }
+  };
+
+  // Renamed to clarify it takes text
+  const processUserMessageText = async (text: string) => {
     // 1. Get AI Response
     try {
-      // Use the ref to ensure we have the latest messages
       const currentHistory = messagesRef.current;
-
       const fullHistory = [
         ...currentHistory,
         { role: "user", text: text } as VoiceMessage
@@ -453,23 +460,16 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
         caseData!
       );
 
-      // Check for duplication before adding (Double safety)
-      setMessages(prev => {
-        const lastMsg = prev[prev.length - 1];
-        if (lastMsg && lastMsg.role === "assistant" && lastMsg.text === responseText) {
-          return prev;
-        }
-        return [...prev, { id: Date.now() + "-ai", role: "assistant", text: responseText }];
-      });
+      setMessages(prev => [...prev, { id: Date.now() + "-ai", role: "assistant", text: responseText }]);
       setAssistantTranscript(responseText);
 
-      // 2. Speak Response
+      setIsProcessing(false);
       speakResponse(responseText);
 
     } catch (e: any) {
       console.error(e);
       setError(e.message || "Failed to get response");
-      isProcessingRef.current = false; // Release lock on error
+      setIsProcessing(false);
     }
   };
 
@@ -478,7 +478,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
 
   const speakResponse = (text: string) => {
     if (!synthesisRef.current) {
-      isProcessingRef.current = false; // Release lock if no speech synth
+      setIsProcessing(false); // Release lock if no speech synth
       return;
     }
 
@@ -502,38 +502,25 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     utterance.onend = () => {
       setIsSpeaking(false);
       activeUtteranceRef.current = null;
-      isProcessingRef.current = false; // Release lock! Processing cycle complete.
-
-      // Auto-listen again using Refs for fresh state
-      if (isConnectedRef.current) {
-        setTimeout(() => {
-          // Check fresh state from refs
-          if (isConnectedRef.current && !isListeningRef.current && recognitionRef.current) {
-            try {
-              recognitionRef.current.start();
-            } catch (e) {
-              console.log("Mic restart ignored/error:", e);
-            }
-          }
-        }, 300); // Increased delay slightly to be safe
+      // Auto-listen again after speaking
+      if (isConnected && !isProcessing) { // don't restart if weird state
+        startRecording();
       }
     };
 
     utterance.onerror = (e) => {
       console.error("Speech synthesis error", e);
-      setIsSpeaking(false);
-      activeUtteranceRef.current = null;
-      isProcessingRef.current = false; // Release lock
+      // Auto-listen again after speaking
+      if (isConnected && !isProcessing) { // don't restart if weird state
+        startRecording();
+      }
     };
 
     synthesisRef.current.speak(utterance);
   };
 
   const disconnectVoiceSession = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
+    stopRecording();
     if (synthesisRef.current) {
       synthesisRef.current.cancel();
       synthesisRef.current = null;
@@ -543,30 +530,38 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     setIsSpeaking(false);
   }, []);
 
-  const playAudioChunk = useCallback((base64Audio: string) => {
-    if (!audioContextRef.current) return;
+
+
+  const handleGetAssessment = async () => {
+    if (!caseData || messages.length === 0 || isAssessing) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsAssessing(true);
 
     try {
-      const audioData = base64ToArrayBuffer(base64Audio);
-      const float32 = pcm16ToFloat32(new Int16Array(audioData));
+      // Use client-side assessment service
+      const assessmentText = await getAssessment(
+        messages.map((m) => ({ role: m.role, content: m.text })),
+        caseData
+      );
 
-      const audioBuffer = audioContextRef.current.createBuffer(1, float32.length, 24000);
-      audioBuffer.copyToChannel(float32 as any, 0);
+      navigation.navigate("Assessment", {
+        assessment: assessmentText,
+        hasCustomCriteria: false,
+        patientName: caseData.patient_name,
+        chiefComplaint: caseData.chief_complaint,
+      });
 
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContextRef.current.destination);
-
-      const currentTime = audioContextRef.current.currentTime;
-      const startTime = Math.max(currentTime, nextPlayTimeRef.current);
-      source.start(startTime);
-      nextPlayTimeRef.current = startTime + audioBuffer.duration;
-    } catch (e: any) {
-      console.error("Error playing audio:", e);
+    } catch (error) {
+      console.error("Error getting assessment:", error);
+      setError("Failed to get assessment. Please try again.");
+    } finally {
+      setIsAssessing(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
+
     return () => {
       disconnectVoiceSession();
     };
@@ -587,11 +582,6 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
   };
 
 
-  const audioPulseStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: withSpring(audioVolume.value) }],
-    };
-  });
 
   return (
     <ThemedView style={styles.container}>
@@ -654,36 +644,49 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
             </View>
           ) : (
             <View style={styles.micButtonContainer}>
-              {isListening && !isConnecting && (
-                <Animated.View
-                  style={[
-                    styles.pulse,
-                    {
-                      backgroundColor: isSpeaking ? theme.link : theme.link,
-                      opacity: 0.3,
-                    },
-                    audioPulseStyle,
-                  ]}
-                />
-              )}
+              {/* Pulse using the actual volume now */}
+              <Animated.View
+                style={[
+                  styles.pulse,
+                  {
+                    backgroundColor: theme.link,
+                    opacity: 0.3,
+                  },
+                  isListening ? {
+                    transform: [{ scale: pulseScale }],
+                    opacity: pulseOpacity
+                  } : {}
+                ]}
+              />
+
               <AnimatedPressable
-                onPress={handleMicPress}
-                disabled={isConnecting}
+                onPress={() => {
+                  // Manual Stop / Tap to talk toggle logic?
+                  // For now, tap to disconnect or maybe tap to FORCE Stop recording?
+                  // Let's make it toggle record/stop manually if VAD is annoying?
+                  // Current logic: handleMicPress calls disconnect.
+                  handleMicPress();
+                }}
+                disabled={isConnecting || isProcessing}
                 style={[
                   styles.micButton,
                   {
-                    backgroundColor: isConnecting
+                    backgroundColor: isConnecting || isProcessing
                       ? theme.tabIconDefault
                       : theme.link,
                   },
                   micButtonStyle,
                 ]}
               >
-                <Feather
-                  name="mic"
-                  size={24}
-                  color="#FFFFFF"
-                />
+                {isProcessing ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Feather
+                    name="mic"
+                    size={24}
+                    color="#FFFFFF"
+                  />
+                )}
               </AnimatedPressable>
             </View>
           )}
@@ -692,11 +695,13 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
             {isConnecting
               ? "Connecting..."
               : isConnected
-                ? isListening
-                  ? "Listening to you..."
-                  : isSpeaking
-                    ? "Patient is speaking..."
-                    : "Session active"
+                ? isProcessing
+                  ? "Thinking..."
+                  : isListening
+                    ? "Listening..."
+                    : isSpeaking
+                      ? "Patient Speaking..."
+                      : "Paused"
                 : "Tap to Start"}
           </ThemedText>
 
@@ -736,40 +741,6 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
   );
 }
 
-function floatTo16BitPCM(float32Array: Float32Array): Int16Array {
-  const int16Array = new Int16Array(float32Array.length);
-  for (let i = 0; i < float32Array.length; i++) {
-    const s = Math.max(-1, Math.min(1, float32Array[i]));
-    int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-  }
-  return int16Array;
-}
-
-function pcm16ToFloat32(int16Array: Int16Array): Float32Array {
-  const float32Array = new Float32Array(int16Array.length);
-  for (let i = 0; i < int16Array.length; i++) {
-    float32Array[i] = int16Array[i] / 0x8000;
-  }
-  return float32Array;
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer | SharedArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
 
 const styles = StyleSheet.create({
   container: {
