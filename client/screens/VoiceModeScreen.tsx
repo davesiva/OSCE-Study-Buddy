@@ -230,7 +230,7 @@ function TranscriptDisplay({
           </ThemedText>
         </View>
       ) : null}
-      {currentAssistantTranscript ? (
+      {currentAssistantTranscript && (!messages.length || messages[messages.length - 1].text !== currentAssistantTranscript) ? (
         <View style={[styles.transcriptBubble, styles.assistantTranscript, { backgroundColor: theme.backgroundDefault }]}>
           <ThemedText style={[styles.transcriptLabel, { opacity: 0.7 }]}>
             Patient:
