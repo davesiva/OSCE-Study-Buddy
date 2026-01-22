@@ -41,8 +41,7 @@
       "expo-web-browser"
     ],
     "experiments": {
-      "reactCompiler": true,
-      "baseUrl": "/OSCE-Study-Buddy"
+      "reactCompiler": true
     }
   }
 }
