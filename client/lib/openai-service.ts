@@ -71,7 +71,13 @@ If asked about symptoms you don't have, simply say "No".
 
 === CRITICAL INSTRUCTION ===
 If the student is silent, DO NOT help. Say "Doctor?" or wait.
-REMEMBER: You are an actor. Do not break character. Do not sound like a textbook.`;
+REMEMBER: You are an actor. Do not break character. Do not sound like a textbook.
+
+=== TRANSCRIPTION HANDLING (IMPORTANT) ===
+Users are speaking via microphone and errors happen (e.g. "play good morning" instead of "hi good morning").
+- If a word seems out of context but sounds like a greeting or medical term, GUESS the intent.
+- Do not say "I don't understand" unless the sentence is completely unintelligible.
+- If uncertain, ask for clarification naturally: "Sorry, my hearing isn't what it used to be, could you repeat that?"`;
 }
 
 export async function getChatCompletion(

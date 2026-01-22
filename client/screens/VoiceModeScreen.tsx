@@ -352,6 +352,17 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
   const recognitionRef = useRef<any>(null);
   const synthesisRef = useRef<SpeechSynthesis | null>(null);
 
+  // Refs for state that needs to be accessed in callbacks/closures without staleness
+  const isListeningRef = useRef(false);
+  const isConnectedRef = useRef(false);
+  const isProcessingRef = useRef(false);
+
+  // Sync refs with state
+  useEffect(() => {
+    isListeningRef.current = isListening;
+    isConnectedRef.current = isConnected;
+  }, [isListening, isConnected]);
+
   const connectToVoiceSession = useCallback(async () => {
     if (!caseData) return;
 
@@ -380,24 +391,22 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
 
       recognition.onend = () => {
         setIsListening(false);
-        // If we are still connected and not speaking, maybe listen again? 
-        // For a simple prototype, we wait for user to press mic again or auto-restart?
-        // Let's keep it manual push-to-talk style for stability, or auto for flow.
-        // Let's do: if "isConnected" is true, wait a bit then start listening again 
-        // UNLESS we are processing a response.
       };
 
       recognition.onresult = async (event: any) => {
+        // If we are already processing a result, ignore subsequent events (prevent double-fire)
+        if (isProcessingRef.current) return;
+
         const transcript = event.results[0][0].transcript;
         if (transcript) {
-          // Clear the "live" transcript since we are about to add it to the committed messages
+          isProcessingRef.current = true; // Lock processing
+
+          // Clear the "live" transcript
           setUserTranscript("");
 
           const newMessage: VoiceMessage = { id: Date.now() + "-user", role: "user", text: transcript };
           setMessages(prev => [...prev, newMessage]);
 
-          // Use the internal function which now uses the ref, OR pas the new list manually?
-          // To be safe, let's call a version of processUserMessage that takes the text
           await processUserMessage(transcript);
         }
       };
@@ -431,11 +440,8 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
 
     // 1. Get AI Response
     try {
-      // Use the ref to ensure we have the latest messages, including the one we just added (or about to add? state update might be async)
-      // Actually, since we just called setMessages in onresult, the Ref might NOT be updated yet!
-      // SAFE BET: Append the new user message to the CURRENT ref value manually for the API call.
+      // Use the ref to ensure we have the latest messages
       const currentHistory = messagesRef.current;
-      // We also need to include the NEW message 'text' which might not be in the ref yet if setMessages hasn't flushed.
 
       const fullHistory = [
         ...currentHistory,
@@ -447,7 +453,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
         caseData!
       );
 
-      // Check for duplication before adding
+      // Check for duplication before adding (Double safety)
       setMessages(prev => {
         const lastMsg = prev[prev.length - 1];
         if (lastMsg && lastMsg.role === "assistant" && lastMsg.text === responseText) {
@@ -462,29 +468,29 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
 
     } catch (e: any) {
       console.error(e);
-      // Show exact error from OpenAI
       setError(e.message || "Failed to get response");
+      isProcessingRef.current = false; // Release lock on error
     }
   };
 
-  // Keep track of active utterance to prevent Garbage Collection
+  // Keep track of active utterance
   const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const speakResponse = (text: string) => {
-    if (!synthesisRef.current) return;
+    if (!synthesisRef.current) {
+      isProcessingRef.current = false; // Release lock if no speech synth
+      return;
+    }
 
-    // specific fix for browser speech synthesis cutting off or not firing onend
     if (synthesisRef.current.speaking) {
       synthesisRef.current.cancel();
     }
 
     setIsSpeaking(true);
     const utterance = new SpeechSynthesisUtterance(text);
-    activeUtteranceRef.current = utterance; // Keep reference!
+    activeUtteranceRef.current = utterance;
 
-    // Pick a voice if possible (Female for female patients, etc)
     const voices = synthesisRef.current.getVoices();
-    // Simple heuristic
     if (caseData?.gender === "Female") {
       const femaleVoice = voices.find(v => v.name.includes("Female") || v.name.includes("Samantha"));
       if (femaleVoice) utterance.voice = femaleVoice;
@@ -496,19 +502,20 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     utterance.onend = () => {
       setIsSpeaking(false);
       activeUtteranceRef.current = null;
+      isProcessingRef.current = false; // Release lock! Processing cycle complete.
 
-      // Auto-listen again after speaking with a small delay
-      if (isConnected && recognitionRef.current) {
+      // Auto-listen again using Refs for fresh state
+      if (isConnectedRef.current) {
         setTimeout(() => {
-          try {
-            // Only start if we are still connected and not already listening
-            if (isConnected && !isListening) {
+          // Check fresh state from refs
+          if (isConnectedRef.current && !isListeningRef.current && recognitionRef.current) {
+            try {
               recognitionRef.current.start();
+            } catch (e) {
+              console.log("Mic restart ignored/error:", e);
             }
-          } catch (e) {
-            console.log("Mic restart ignored:", e);
           }
-        }, 100);
+        }, 300); // Increased delay slightly to be safe
       }
     };
 
@@ -516,6 +523,7 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
       console.error("Speech synthesis error", e);
       setIsSpeaking(false);
       activeUtteranceRef.current = null;
+      isProcessingRef.current = false; // Release lock
     };
 
     synthesisRef.current.speak(utterance);
