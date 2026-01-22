@@ -37,6 +37,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import type { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { getChatCompletion, getAssessment, transcribeAudio } from "@/lib/gemini-service";
+import { useGeminiLive } from "@/hooks/use-gemini-live";
 
 interface CaseData {
   case_id: string;

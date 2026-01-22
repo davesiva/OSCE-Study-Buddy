@@ -1,14 +1,182 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "node:http";
-import OpenAI from "openai";
 import * as fs from "fs";
 import * as path from "path";
-import { setupRealtimeWebSocket } from "./realtime";
+import { setupWebSocket } from "./websocket";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+interface CaseData {
+  case_id: string;
+  patient_name: string;
+  age: number;
+  gender: string;
+  chief_complaint: string;
+  presenting_history: string;
+  vitals: Record<string, string>;
+  past_medical_history: string[];
+  social_history: string;
+  allergies: string;
+  script_instructions: string;
+  secret_info: string;
+  expected_diagnosis: string;
+  menstrual_history?: string;
+  assessment_criteria?: string;
+}
 
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Get all cases
+  app.get("/api/cases", (_req: Request, res: Response) => {
+    try {
+      const casesDir = path.resolve(process.cwd(), "cases");
+      const cases: CaseData[] = [];
+
+      if (fs.existsSync(casesDir)) {
+        const files = fs.readdirSync(casesDir);
+        for (const file of files) {
+          if (file.endsWith(".json")) {
+            try {
+              const filePath = path.join(casesDir, file);
+              const content = fs.readFileSync(filePath, "utf-8");
+              const caseData = JSON.parse(content) as CaseData;
+              cases.push(caseData);
+            } catch (err) {
+              console.error(`Failed to load case file ${file}:`, err);
+            }
+          }
+        }
+      }
+
+      res.json(cases);
+    } catch (error) {
+      console.error("Error loading cases:", error);
+      res.status(500).json({ error: "Failed to load cases" });
+    }
+  });
+
+  // Get a specific case
+  app.get("/api/cases/:caseId", (req: Request, res: Response) => {
+    try {
+      const { caseId } = req.params;
+      const casesDir = path.resolve(process.cwd(), "cases");
+
+      if (fs.existsSync(casesDir)) {
+        const files = fs.readdirSync(casesDir);
+        for (const file of files) {
+          if (file.endsWith(".json")) {
+            const filePath = path.join(casesDir, file);
+            const content = fs.readFileSync(filePath, "utf-8");
+            const caseData = JSON.parse(content) as CaseData;
+            if (caseData.case_id === caseId) {
+              res.json(caseData);
+              return;
+            }
+          }
+        }
+      }
+
+      res.status(404).json({ error: "Case not found" });
+    } catch (error) {
+      console.error("Error loading case:", error);
+      res.status(500).json({ error: "Failed to load case" });
+    }
+  });
+
+  // Save feedback
+  app.post("/api/feedback", (req: Request, res: Response) => {
+    try {
+      const { feedback, rating } = req.body as { feedback: string; rating: string };
+
+      if (!feedback) {
+        res.status(400).json({ error: "Feedback is required" });
+        return;
+      }
+
+      const feedbackFile = path.resolve(process.cwd(), "feedback.csv");
+      const timestamp = new Date().toISOString();
+      const line = `"${timestamp}","${feedback.replace(/"/g, '""')}","${rating}"\n`;
+
+      if (!fs.existsSync(feedbackFile)) {
+        fs.writeFileSync(feedbackFile, "timestamp,feedback,rating\n");
+      }
+
+      fs.appendFileSync(feedbackFile, line);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error saving feedback:", error);
+      res.status(500).json({ error: "Failed to save feedback" });
+    }
+  });
+
+  // Save a custom case (upload)
+  app.post("/api/cases", (req: Request, res: Response) => {
+    try {
+      const caseData = req.body as CaseData & { is_custom?: boolean };
+
+      if (!caseData.patient_name || !caseData.chief_complaint) {
+        res.status(400).json({ error: "Patient name and chief complaint are required" });
+        return;
+      }
+
+      const casesDir = path.resolve(process.cwd(), "cases");
+      if (!fs.existsSync(casesDir)) {
+        fs.mkdirSync(casesDir, { recursive: true });
+      }
+
+      const fileName = `case_custom_${caseData.case_id || Date.now()}.json`;
+      const filePath = path.join(casesDir, fileName);
+
+      fs.writeFileSync(filePath, JSON.stringify(caseData, null, 2));
+
+      res.json({ success: true, case_id: caseData.case_id, fileName });
+    } catch (error) {
+      console.error("Error saving case:", error);
+      res.status(500).json({ error: "Failed to save case" });
+    }
+  });
+
+  // Update case with assessment criteria
+  app.patch("/api/cases/:caseId/criteria", (req: Request, res: Response) => {
+    try {
+      const { caseId } = req.params;
+      const { assessment_criteria } = req.body as { assessment_criteria: string };
+
+      const casesDir = path.resolve(process.cwd(), "cases");
+
+      if (fs.existsSync(casesDir)) {
+        const files = fs.readdirSync(casesDir);
+        for (const file of files) {
+          if (file.endsWith(".json")) {
+            const filePath = path.join(casesDir, file);
+            const content = fs.readFileSync(filePath, "utf-8");
+            const caseData = JSON.parse(content) as CaseData;
+            if (caseData.case_id === caseId) {
+              caseData.assessment_criteria = assessment_criteria;
+              fs.writeFileSync(filePath, JSON.stringify(caseData, null, 2));
+              res.json({ success: true });
+              return;
+            }
+          }
+        }
+      }
+
+      res.status(404).json({ error: "Case not found" });
+    } catch (error) {
+      console.error("Error updating case criteria:", error);
+      res.status(500).json({ error: "Failed to update assessment criteria" });
+    }
+  });
+
+  // Health check
+  app.get("/api/health", (_req: Request, res: Response) => {
+    res.json({ status: "ok" });
+  });
+
+  const httpServer = createServer(app);
+
+  // Initialize WebSocket Server for Gemini Live
+  setupWebSocket(httpServer);
+
+  return httpServer;
+}
 interface CaseData {
   case_id: string;
   patient_name: string;
