@@ -447,7 +447,14 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
         caseData!
       );
 
-      setMessages(prev => [...prev, { id: Date.now() + "-ai", role: "assistant", text: responseText }]);
+      // Check for duplication before adding
+      setMessages(prev => {
+        const lastMsg = prev[prev.length - 1];
+        if (lastMsg && lastMsg.role === "assistant" && lastMsg.text === responseText) {
+          return prev;
+        }
+        return [...prev, { id: Date.now() + "-ai", role: "assistant", text: responseText }];
+      });
       setAssistantTranscript(responseText);
 
       // 2. Speak Response
@@ -460,11 +467,20 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
     }
   };
 
+  // Keep track of active utterance to prevent Garbage Collection
+  const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
   const speakResponse = (text: string) => {
     if (!synthesisRef.current) return;
 
+    // specific fix for browser speech synthesis cutting off or not firing onend
+    if (synthesisRef.current.speaking) {
+      synthesisRef.current.cancel();
+    }
+
     setIsSpeaking(true);
     const utterance = new SpeechSynthesisUtterance(text);
+    activeUtteranceRef.current = utterance; // Keep reference!
 
     // Pick a voice if possible (Female for female patients, etc)
     const voices = synthesisRef.current.getVoices();
@@ -479,10 +495,27 @@ export default function VoiceModeScreen({ route, navigation }: VoiceModeScreenPr
 
     utterance.onend = () => {
       setIsSpeaking(false);
-      // Auto-listen again after speaking
+      activeUtteranceRef.current = null;
+
+      // Auto-listen again after speaking with a small delay
       if (isConnected && recognitionRef.current) {
-        try { recognitionRef.current.start(); } catch { }
+        setTimeout(() => {
+          try {
+            // Only start if we are still connected and not already listening
+            if (isConnected && !isListening) {
+              recognitionRef.current.start();
+            }
+          } catch (e) {
+            console.log("Mic restart ignored:", e);
+          }
+        }, 100);
       }
+    };
+
+    utterance.onerror = (e) => {
+      console.error("Speech synthesis error", e);
+      setIsSpeaking(false);
+      activeUtteranceRef.current = null;
     };
 
     synthesisRef.current.speak(utterance);
