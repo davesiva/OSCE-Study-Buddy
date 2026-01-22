@@ -8,7 +8,7 @@ export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
 
   if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
+    return ""; // Return empty string for relative paths
   }
 
   if (host.startsWith("http://") || host.startsWith("https://")) {
@@ -30,7 +30,16 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const baseUrl = getApiUrl();
-  const url = new URL(route, baseUrl);
+  // If baseUrl is empty/relative, don't use new URL() with a base, or use window.location.origin if needed.
+  // Actually, fetch handles relative paths fine if we just pass the route.
+  // But new URL(route, baseUrl) requires valid base if route is relative.
+
+  let url: URL | string;
+  if (baseUrl) {
+    url = new URL(route, baseUrl);
+  } else {
+    url = route;
+  }
 
   const res = await fetch(url, {
     method,
