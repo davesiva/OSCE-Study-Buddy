@@ -30,6 +30,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { MedicalIcon, MedicalIconType } from "@/components/MedicalIcons";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { getApiUrl } from "@/lib/query-client";
+import { generateCase } from "@/lib/openai-service";
 
 const LOCAL_CASES_KEY = "custom_cases_local";
 
@@ -219,6 +220,11 @@ export default function CreateCaseScreen() {
       setIsGenerating(true);
       setErrors([]);
 
+      // Use client-side generation to avoid Render timeout
+      const data = await generateCase(selectedSpecialty, selectedDifficulty);
+
+      // (Validation bypassed as generateCase returns data directly)
+      /* 
       const response = await fetch(new URL("/api/generate-case", getApiUrl()).toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -231,8 +237,8 @@ export default function CreateCaseScreen() {
       if (!response.ok) {
         throw new Error("Failed to generate case");
       }
-
       const { data } = await response.json();
+      */
 
       setFormData({
         patient_name: data.patient_name || "",
@@ -245,8 +251,8 @@ export default function CreateCaseScreen() {
         respiratory_rate: data.respiratory_rate || "",
         temperature: data.temperature || "",
         spo2: data.spo2 || "",
-        past_medical_history: Array.isArray(data.past_medical_history) 
-          ? data.past_medical_history.join("\n") 
+        past_medical_history: Array.isArray(data.past_medical_history)
+          ? data.past_medical_history.join("\n")
           : data.past_medical_history || "",
         social_history: data.social_history || "",
         allergies: data.allergies || "",
@@ -269,7 +275,7 @@ export default function CreateCaseScreen() {
   const handleImportPDF = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      
+
       const result = await DocumentPicker.getDocumentAsync({
         type: ["application/pdf", "text/plain"],
         copyToCacheDirectory: true,
@@ -286,13 +292,13 @@ export default function CreateCaseScreen() {
       setErrors([]);
 
       let content = "";
-      
+
       if (Platform.OS === "web") {
         const response = await fetch(file.uri);
         content = await response.text();
       } else {
         content = await FileSystem.readAsStringAsync(file.uri, {
-          encoding: FileSystem.EncodingType.UTF8,
+          encoding: "utf8",
         });
       }
 
@@ -319,8 +325,8 @@ export default function CreateCaseScreen() {
         respiratory_rate: data.respiratory_rate || "",
         temperature: data.temperature || "",
         spo2: data.spo2 || "",
-        past_medical_history: Array.isArray(data.past_medical_history) 
-          ? data.past_medical_history.join("\n") 
+        past_medical_history: Array.isArray(data.past_medical_history)
+          ? data.past_medical_history.join("\n")
           : data.past_medical_history || "",
         social_history: data.social_history || "",
         allergies: data.allergies || "",
@@ -478,8 +484,8 @@ export default function CreateCaseScreen() {
                     step.id === currentStep
                       ? "#0066CC"
                       : step.id < currentStep
-                      ? "#10B981"
-                      : theme.backgroundSecondary,
+                        ? "#10B981"
+                        : theme.backgroundSecondary,
                 },
               ]}
             >
@@ -511,7 +517,7 @@ export default function CreateCaseScreen() {
       <ThemedText type="h4" style={styles.stepTitle}>
         How would you like to create your case?
       </ThemedText>
-      
+
       <ThemedText style={styles.methodDescription}>
         Choose to start from scratch, import from a document, or generate with AI.
       </ThemedText>

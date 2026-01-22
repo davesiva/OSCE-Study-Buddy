@@ -436,9 +436,19 @@ export default function OSCESimulatorScreen() {
         content: responseContent,
       };
 
-      const updatedMessages = [...newMessages, assistantMessage];
-      setMessages(updatedMessages);
-      saveChatHistory(selectedCase.case_id, updatedMessages);
+      // Check to prevent accidental duplication if state updates overlap
+      setMessages(currentMsgs => {
+        const lastMsg = currentMsgs[currentMsgs.length - 1];
+        if (lastMsg && lastMsg.role === "assistant" && lastMsg.content === responseContent) {
+          return currentMsgs;
+        }
+        const updatedMessages = [...currentMsgs, assistantMessage];
+        saveChatHistory(selectedCase.case_id, updatedMessages);
+        return updatedMessages;
+      });
+      // const updatedMessages = [...newMessages, assistantMessage]; // Removing this OLD way
+      // setMessages(updatedMessages);
+      // saveChatHistory(selectedCase.case_id, updatedMessages);
     } catch (error: any) {
       console.error("Error sending message:", error);
       const errorMessage: ChatMessage = {
@@ -702,7 +712,6 @@ const styles = StyleSheet.create({
   timerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: Spacing.xs,
     alignSelf: "flex-end", // Position it nicely, or maybe inline with selector?
     // Let's put it below selector but above details
     marginTop: -8, // slight tuck

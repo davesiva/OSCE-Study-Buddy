@@ -181,3 +181,111 @@ Provide a critical, breakdown of the performance.
     const data = await response.json();
     return data.choices[0]?.message?.content || "Unable to generate assessment.";
 }
+
+export async function generateCase(
+    specialty: string,
+    difficulty: string
+): Promise<any> {
+    const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+    if (!apiKey) throw new Error("Missing API Key");
+
+    const specialtyNames: Record<string, string> = {
+        cardiology: "Cardiology (heart conditions)",
+        respiratory: "Respiratory (lung conditions)",
+        gastroenterology: "Gastroenterology (digestive system)",
+        neurology: "Neurology (nervous system)",
+        renal: "Renal (kidney conditions)",
+        endocrine: "Endocrinology (hormonal conditions)",
+        msk: "Musculoskeletal (bones, joints, muscles)",
+        obgyn: "Obstetrics & Gynaecology",
+        infectious: "Infectious Diseases",
+        psychiatry: "Psychiatry (mental health conditions)",
+    };
+
+    const difficultyInstructions: Record<string, string> = {
+        easy: `Create a TEXTBOOK/CLASSIC presentation that medical students learn in their early years.
+- The diagnosis should be obvious with clear, classic symptoms
+- Use common conditions
+- Patient gives clear, straightforward answers
+- No red herrings`,
+        medium: `Create an ATYPICAL presentation of a relatively common condition.
+- The symptoms may not follow the textbook presentation
+- Include some distractors
+- Patient may give vague answers initially but reveals key info when probed`,
+        challenging: `Create a CHALLENGING case with either a rare condition OR a common condition with very unusual presentation.
+- Include multiple red herrings and distractors
+- The diagnosis should be non-obvious`,
+    };
+
+    const psychiatryInstructions = specialty === "psychiatry" ? `
+PSYCHIATRY-SPECIFIC INSTRUCTIONS (CRITICAL):
+The patient's SPEECH PATTERN and BEHAVIOR must authentically reflect their psychiatric condition.
+` : "";
+
+    const prompt = `You are an expert medical educator creating OSCE cases.
+
+Generate a realistic patient case for: ${specialtyNames[specialty] || specialty}
+Difficulty: ${difficulty?.toUpperCase() || "MEDIUM"}
+
+${difficultyInstructions[difficulty] || difficultyInstructions.medium}
+${psychiatryInstructions}
+SINGAPORE CONTEXT (IMPORTANT):
+- Use Singaporean patient names and demographics
+- Reference local healthcare settings (polyclinic, SGH, NUH)
+- Include locally relevant conditions and social history (HDB, hawker food)
+
+Generate a complete case in the following JSON format:
+{
+  "patient_name": "Full Singaporean name with title",
+  "age": <age as number>,
+  "gender": "Male or Female",
+  "chief_complaint": "Main presenting complaint",
+  "presenting_history": "Detailed history (3-5 sentences)",
+  "blood_pressure": "e.g., 130/85 mmHg",
+  "heart_rate": "e.g., 88 bpm",
+  "respiratory_rate": "e.g., 18/min",
+  "temperature": "e.g., 37.2°C",
+  "spo2": "e.g., 98% on room air",
+  "past_medical_history": ["Condition 1", "Condition 2"],
+  "social_history": "Occupation, smoking/alcohol status, etc",
+  "allergies": "Known allergies or NKDA",
+  "script_instructions": "Detailed acting instructions",
+  "secret_info": "Info revealed only upon specific questioning",
+  "expected_diagnosis": "The actual diagnosis"
+}
+
+Return ONLY the JSON object, no additional text.`;
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            max_tokens: 2000,
+            temperature: 0.8,
+        }),
+    });
+
+    if (!response.ok) {
+        throw new Error("Failed to generate case");
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content || "";
+
+    // Simple JSON extraction
+    try {
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+        }
+        return JSON.parse(content);
+    } catch (e) {
+        console.error("Failed to parse AI response as JSON", content);
+        throw new Error("Invalid format received from AI");
+    }
+}
